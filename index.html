@@ -7,131 +7,232 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Geflügelliste">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#2f6b3a">
+<meta name="theme-color" content="#23603a">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>Geflügelliste</title>
 <style>
-/* Hofladen-Werkzeug: grüne Kopfleiste mit Reitern, darunter Karten in einer Spalte, große Zahlen für „noch frei“ */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap');
+/* Hofladen-Werkzeug im Stil eines Waagen-Etiketts: grüne Kopfzeile, Tab-Leiste unten,
+   Kacheln mit großen schmalen Zahlen für „noch frei“, Eigelb als einziger Akzent */
 :root{
-  --bg:#eef1ea; --card:#fff; --field:#fff; --soft:#e6eadf; --ink:#1f2a1f; --mute:#5f6b5c; --line:#d9dfd2; --fieldline:#c3cbbb;
-  --green:#2f6b3a; --ongreen:#fff; --navmute:#cfe3d2; --greenbg:#dfeee1; --red:#b3261e; --redbg:#fbe4e1; --redline:#e8bdb8; --amber:#a35f00; --amberbg:#fcefd4;
-  --r:14px;
+  --bg:#f1f3ee; --card:#fff; --field:#fff; --soft:#e8ece3; --ink:#17221a; --mute:#5b675d; --line:#dde3d7; --fieldline:#c4ccbd;
+  --green:#23603a; --green-ink:#1d5232; --ongreen:#fff; --greenbg:#e1efe4;
+  --yolk:#f3b52f; --yolkbg:#fdf1d2; --yolkink:#7a5200;
+  --red:#b3261e; --redbg:#fbe4e1; --redline:#e8bdb8; --amber:#9a5a00; --amberbg:#fcefd4;
+  --av1:#dce9f5; --av1i:#2b4f73; --av2:#f6e0e4; --av2i:#7a2e40; --av3:#e9e4f5; --av3i:#4a3a78;
+  --shadow:0 1px 2px rgba(23,34,26,.05),0 6px 18px rgba(23,34,26,.06);
+  --scrim:rgba(14,20,16,.5);
+  --f-display:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --f-body:"Barlow",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --r:16px;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#121712; --card:#1b221b; --field:#222a22; --soft:#263026; --ink:#e7eee4; --mute:#a3b0a0; --line:#2f3a2f; --fieldline:#3d4a3d;
-  --green:#3f8a4d; --ongreen:#fff; --navmute:#cfe3d2; --greenbg:#1f3523; --red:#ff8a7f; --redbg:#3b1d1a; --redline:#6b2f29; --amber:#f0b04a; --amberbg:#3a2c12;
+  --bg:#0e1410; --card:#172019; --field:#1e2820; --soft:#223025; --ink:#e6eee5; --mute:#9fae9f; --line:#2a372c; --fieldline:#3a4a3c;
+  --green:#2f7a4a; --green-ink:#8fd3a5; --ongreen:#fff; --greenbg:#1b3324;
+  --yolk:#f3b52f; --yolkbg:#3a2e12; --yolkink:#f3c862;
+  --red:#ff8a7f; --redbg:#3b1d1a; --redline:#6b2f29; --amber:#f0b04a; --amberbg:#3a2c12;
+  --av1:#1f3346; --av1i:#a9cdef; --av2:#41232b; --av2i:#f0b4c2; --av3:#2d2645; --av3i:#c9bdf0;
+  --shadow:none; --scrim:rgba(0,0,0,.6);
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
-  --bg:#121712; --card:#1b221b; --field:#222a22; --soft:#263026; --ink:#e7eee4; --mute:#a3b0a0; --line:#2f3a2f; --fieldline:#3d4a3d;
-  --green:#3f8a4d; --ongreen:#fff; --navmute:#cfe3d2; --greenbg:#1f3523; --red:#ff8a7f; --redbg:#3b1d1a; --redline:#6b2f29; --amber:#f0b04a; --amberbg:#3a2c12;
+  --bg:#0e1410; --card:#172019; --field:#1e2820; --soft:#223025; --ink:#e6eee5; --mute:#9fae9f; --line:#2a372c; --fieldline:#3a4a3c;
+  --green:#2f7a4a; --green-ink:#8fd3a5; --ongreen:#fff; --greenbg:#1b3324;
+  --yolk:#f3b52f; --yolkbg:#3a2e12; --yolkink:#f3c862;
+  --red:#ff8a7f; --redbg:#3b1d1a; --redline:#6b2f29; --amber:#f0b04a; --amberbg:#3a2c12;
+  --av1:#1f3346; --av1i:#a9cdef; --av2:#41232b; --av2i:#f0b4c2; --av3:#2d2645; --av3i:#c9bdf0;
+  --shadow:none; --scrim:rgba(0,0,0,.6);
   color-scheme:dark;
 }
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 var(--f-body)}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--green)}
-header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--green);color:var(--ongreen);padding-block:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-header h1{font-size:20px;margin:0;padding:12px 0 8px}
-header .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.sync{margin-left:auto;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px;background:rgba(255,255,255,.16);color:var(--ongreen)}
+:focus-visible{outline:3px solid var(--yolk);outline-offset:2px}
+
+/* Kopfzeile */
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--green);color:var(--ongreen);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header .top{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:10px}
+header .mark{width:26px;height:26px;flex:none}
+header h1{font:700 26px/1 var(--f-display);letter-spacing:.01em;margin:0}
+.sync{margin-left:auto;font-size:13px;font-weight:600;border-radius:999px;padding:4px 11px;background:rgba(255,255,255,.14);color:var(--ongreen);white-space:nowrap}
 .sync::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#cfd8cc;vertical-align:1px}
 .sync.live::before{background:#7ee08f}
-.sync.loading::before{background:#f2c14e}
+.sync.loading::before{background:var(--yolk)}
 .sync.error::before{background:#ff8a7f}
-.banner{border-color:var(--amber);background:var(--amberbg);color:var(--ink)}
-nav{display:flex;gap:4px;overflow-x:auto}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-nav button{flex:1;min-width:72px;background:none;border:0;color:var(--navmute);font-weight:600;font-size:16px;font-family:inherit;padding:12px 8px;border-bottom:4px solid transparent;cursor:pointer}
-nav button.on{color:var(--ongreen);border-bottom-color:var(--ongreen)}
-main{max-width:1000px;margin:0 auto;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-:focus-visible{outline:3px solid var(--green);outline-offset:2px}
-h2{font-size:22px;margin:4px 0 12px}
-h3{font-size:18px;margin:20px 0 8px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:14px}
+
+/* Tab-Leiste unten */
+nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav.tabbar .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+nav.tabbar button{position:relative;background:none;border:0;color:var(--mute);font:600 12px/1.2 var(--f-body);padding:9px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav.tabbar svg{width:25px;height:25px}
+nav.tabbar button.on{color:var(--green-ink)}
+nav.tabbar button.on::before{content:"";position:absolute;top:0;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--yolk)}
+
+main{max-width:1000px;margin:0 auto;padding-top:18px;padding-bottom:calc(96px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* Typografie */
+h2{font:700 30px/1.05 var(--f-display);margin:0;text-wrap:balance}
+h3{font:700 20px/1.1 var(--f-display);margin:22px 0 10px;letter-spacing:.01em}
+.phead{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:2px 0 14px}
+.phead .sub{color:var(--mute);font-size:15px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mute)}
+.mute{color:var(--mute);font-size:15px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .sp{flex:1}
-.mute{color:var(--mute);font-size:15px}
-button.b{font-weight:600;font-size:16px;font-family:inherit;border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:12px;padding:11px 16px;min-height:44px;cursor:pointer}
+
+/* Flächen */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:var(--shadow);min-width:0}
+.banner{border-color:var(--yolk);background:var(--yolkbg)}
+.empty{text-align:center;color:var(--mute);padding:36px 14px}
+.empty svg{width:44px;height:44px;color:var(--fieldline);display:block;margin:0 auto 10px}
+.warn{background:var(--redbg);color:var(--red);border-radius:12px;padding:10px 14px;margin:10px 0;font-weight:600}
+
+/* Knöpfe & Chips */
+button.b{font:600 16px var(--f-body);border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:12px;padding:11px 16px;min-height:46px;cursor:pointer;transition:transform .08s}
+button.b:active,.chip:active{transform:scale(.97)}
 button.b.pri{background:var(--green);border-color:var(--green);color:var(--ongreen)}
-button.b.dan{color:var(--red);border-color:var(--redline)}
-button.b.sm{padding:6px 12px;min-height:36px;font-size:15px}
-.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
-.chip{flex:none;border:1px solid var(--line);background:var(--field);border-radius:999px;padding:9px 16px;font-weight:600;font-size:15px;font-family:inherit;cursor:pointer;color:var(--ink)}
-.chip.on{background:var(--green);color:var(--ongreen);border-color:var(--green)}
-table{width:100%;border-collapse:collapse}
-th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
-th{font-size:14px;color:var(--mute);font-weight:600}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-.free{font-size:26px;font-weight:700}
-.free.ok{color:var(--green)} .free.zero{color:var(--amber)} .free.neg{color:var(--red)}
-.tag{display:inline-block;border-radius:999px;padding:3px 11px;font-size:14px;font-weight:600}
+button.b.dan{color:var(--red);border-color:var(--redline);background:transparent}
+button.b.sm{padding:6px 13px;min-height:38px;font-size:15px}
+.big{font-size:19px;padding:14px 24px;min-height:56px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;margin-bottom:8px;scrollbar-width:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:9px 16px;font:600 15px var(--f-body);cursor:pointer;color:var(--ink)}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.add{border-style:dashed;color:var(--green-ink)}
+.tag{display:inline-block;border-radius:999px;padding:3px 11px;font-size:13px;font-weight:700;white-space:nowrap}
 .tag.res{background:var(--amberbg);color:var(--amber)}
-.tag.sold{background:var(--greenbg);color:var(--green)}
-.parts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-.part{background:var(--soft);border-radius:10px;padding:6px 11px;font-size:15px}
-.part.neg{background:var(--redbg);color:var(--red);font-weight:600}
-.order{cursor:pointer}
-.order .top{display:flex;gap:10px;align-items:center}
-.order .name{font-weight:700;font-size:18px}
-.order .lines{margin-top:4px}
-.order .sum{font-weight:700;font-variant-numeric:tabular-nums}
-.empty{text-align:center;color:var(--mute);padding:34px 10px}
-input,select,textarea{font-size:17px;font-family:inherit;border:1px solid var(--fieldline);border-radius:10px;padding:10px 12px;min-height:44px;background:var(--field);color:var(--ink);width:100%}
-input[type=number],input.num{text-align:right}
-label{display:block;font-size:14px;color:var(--mute);font-weight:600;margin:12px 0 4px}
-.grid{display:grid;gap:10px}
-.g2{grid-template-columns:1fr 1fr}
-#modal{position:fixed;inset:0;background:rgba(20,25,18,.5);display:none;z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch}
-#modal.show,#dlg.show{display:block}
-#dlg{position:fixed;inset:0;background:rgba(10,14,10,.55);display:none;z-index:30;padding-top:env(safe-area-inset-top,0px)}
-.dlg{max-width:440px;margin-top:18vh}
-.dlg p{margin:0 0 12px;font-size:18px}
-.sheet{background:var(--bg);max-width:720px;margin:24px auto;border-radius:18px;padding:18px;width:calc(100% - 24px)}
-.line{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
-.l1{display:grid;grid-template-columns:1fr 72px 84px 112px 44px;gap:8px;align-items:center}
-.lhead{font-size:13px;color:var(--mute);font-weight:600;padding:0 11px 4px}
-.lhead span:nth-child(n+2){text-align:right}
-.warn{background:var(--redbg);color:var(--red);border-radius:10px;padding:10px 12px;margin:10px 0;font-weight:600}
-.stat{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
-.stat .card{flex:1;min-width:180px;margin:0}
-.stat b{display:block;font-size:28px}
-.bar{height:12px;background:var(--greenbg);border-radius:6px;overflow:hidden;min-width:60px}
-.bar i{display:block;height:100%;background:var(--green)}
-.set td input{padding:8px;min-height:40px}
+.tag.sold{background:var(--greenbg);color:var(--green-ink)}
+
+/* Tabellen */
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th{font-size:12px;color:var(--mute);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .scroll{overflow-x:auto}
 .scroll table th,.scroll table td{white-space:nowrap}
-.search{font-size:19px;padding:12px 14px;margin-bottom:12px}
-.pick{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center}
-.pick .name{font-weight:700;font-size:20px}
-.pick .what{grid-column:1/-1;color:var(--mute);font-size:15px}
-.sale-name{font-size:26px;font-weight:700;text-wrap:balance}
-.sale-ordernote{background:var(--amberbg);color:var(--amber);border-radius:10px;padding:8px 12px;margin-top:10px;font-weight:600}
-.sale-line{display:grid;grid-template-columns:58px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
-.sale-q{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--green)}
+.bar{height:10px;background:var(--soft);border-radius:5px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--green);border-radius:5px}
+
+/* Formulare */
+input,select,textarea{font:17px var(--f-body);border:1px solid var(--fieldline);border-radius:12px;padding:10px 12px;min-height:46px;background:var(--field);color:var(--ink);width:100%}
+input[type=number],input.num{text-align:right;font-variant-numeric:tabular-nums}
+label{display:block;font-size:13px;color:var(--mute);font-weight:700;letter-spacing:.04em;margin:14px 0 5px}
+.grid{display:grid;gap:10px}
+.g2{grid-template-columns:1fr 1fr}
+.chk{display:flex;gap:10px;align-items:center;margin:10px 0 0;color:var(--ink);font-size:16px;font-weight:500;letter-spacing:0}
+.chk input{width:24px;height:24px;min-height:24px;accent-color:var(--green)}
+.set td input,.set td select{padding:8px;min-height:42px}
+
+/* Suche */
+.searchwrap{position:relative;margin-bottom:12px}
+.searchwrap svg{position:absolute;left:15px;top:50%;width:22px;height:22px;transform:translateY(-50%);color:var(--mute);pointer-events:none}
+.search{font-size:19px;padding:13px 14px 13px 46px;border-radius:14px;box-shadow:var(--shadow)}
+
+/* Bestand: Kopf des Schlachttermins und Kacheln */
+.hero{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:start}
+.hero .facts{grid-column:1/-1;display:flex;gap:22px;flex-wrap:wrap;margin-top:6px}
+.hero .facts div{display:flex;flex-direction:column}
+.hero .facts b{font:700 26px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.hero .facts span{font-size:13px;color:var(--mute)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px 13px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.tile .t-name{font-weight:600;padding-right:4px}
+.tile .t-num{font:700 46px/1 var(--f-display);font-variant-numeric:tabular-nums;color:var(--green-ink);margin-top:4px}
+.tile .t-num small{font-size:16px;font-weight:600;color:var(--mute);margin-left:4px;letter-spacing:.02em}
+.tile .t-sub{font-size:13px;color:var(--mute)}
+.tile .t-price{font-size:12px;color:var(--mute);font-weight:600}
+.tile.zero .t-num{color:var(--amber)}
+.tile.neg{border-color:var(--redline);background:var(--redbg)}
+.tile.neg .t-num{color:var(--red)}
+.tile.na .t-num{color:var(--fieldline)}
+.meter{height:6px;border-radius:3px;background:var(--soft);overflow:hidden;margin-top:9px}
+.meter i{display:block;height:100%;background:var(--green);border-radius:3px}
+.tile.zero .meter i{background:var(--yolk)}
+.tile.neg .meter i{background:var(--red)}
+.parts{display:flex;gap:8px;flex-wrap:wrap}
+.part{background:var(--soft);border-radius:10px;padding:6px 11px;font-size:14px;font-variant-numeric:tabular-nums}
+.part b{font-weight:700}
+.part.neg{background:var(--redbg);color:var(--red);font-weight:600}
+
+/* Bestellkarten (Bestand + Verkauf) */
+.order{cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;align-items:center;transition:transform .08s}
+.order:active{transform:scale(.99)}
+.order .av{grid-row:span 2}
+.order .name{font-weight:700;font-size:19px;line-height:1.2}
+.order .meta{color:var(--mute);font-size:14px}
+.order .right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;grid-row:span 2}
+.order .sum{font:700 22px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.order .items,.order .foot{grid-column:2/-1}
+.order .foot{margin-top:8px}
+.av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font:700 21px/1 var(--f-display);background:var(--greenbg);color:var(--green-ink);flex:none}
+.av.a1{background:var(--av1);color:var(--av1i)}
+.av.a2{background:var(--av2);color:var(--av2i)}
+.av.a3{background:var(--av3);color:var(--av3i)}
+.items{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.ic{display:inline-flex;gap:5px;align-items:baseline;background:var(--soft);border-radius:8px;padding:3px 9px;font-size:15px;line-height:1.35}
+.ic b{font:700 17px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.ic i{font-style:normal;color:var(--mute);font-size:13px}
+.ic.note{background:var(--yolkbg);color:var(--yolkink);font-weight:600;font-size:14px}
+
+/* Modale Fenster */
+#modal{position:fixed;inset:0;background:var(--scrim);display:none;z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-top:env(safe-area-inset-top,0px)}
+#modal.show{display:flex;flex-direction:column}
+#dlg{position:fixed;inset:0;background:var(--scrim);display:none;z-index:30;padding-top:env(safe-area-inset-top,0px)}
+#dlg.show{display:block}
+.sheet{background:var(--bg);max-width:720px;margin:28px auto;border-radius:22px;padding:20px;width:calc(100% - 24px);animation:sheet-in .22s ease-out}
+.sheet h2{margin-bottom:4px}
+.dlg{max-width:440px;margin-top:18vh}
+.dlg p{margin:0 0 12px;font-size:18px}
+@keyframes sheet-in{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){.sheet{animation:none}button.b,.chip,.order{transition:none}}
+.line{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.l1{display:grid;grid-template-columns:1fr 72px 84px 112px 46px;gap:8px;align-items:center}
+.lhead{font-size:12px;color:var(--mute);font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:0 13px 5px}
+.lhead span:nth-child(n+2){text-align:right}
+
+/* Ausgabe-Ansicht */
+.sale-name{font:700 34px/1.05 var(--f-display);text-wrap:balance}
+.sale-ordernote{background:var(--yolkbg);color:var(--yolkink);border-radius:12px;padding:9px 13px;margin-top:12px;font-weight:600}
+.sale-line{display:grid;grid-template-columns:62px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.sale-line:last-child{border-bottom:0}
+.sale-q{font:700 34px/1 var(--f-display);font-variant-numeric:tabular-nums;color:var(--green-ink)}
 .sale-p{min-width:0}
 .sale-p b{font-size:21px}
-.sale-note{display:inline-block;margin-top:4px;background:var(--amberbg);color:var(--amber);border-radius:8px;padding:2px 9px;font-weight:600;font-size:15px}
+.sale-note{display:inline-block;margin-top:5px;background:var(--yolkbg);color:var(--yolkink);border-radius:8px;padding:2px 9px;font-weight:600;font-size:14px}
 .sale-in{display:flex;gap:6px}
-.sale-in input{width:92px}
-.sale-total{display:flex;justify-content:space-between;align-items:baseline;font-size:20px;padding:16px 0 4px}
-.sale-total b{font-size:30px;font-variant-numeric:tabular-nums}
-.chk{display:flex;gap:10px;align-items:center;margin:10px 0 0;color:var(--ink);font-size:16px;font-weight:500}
-.chk input{width:24px;height:24px;min-height:24px;accent-color:var(--green)}
-.big{font-size:19px;padding:14px 22px;min-height:54px}
-@media(max-width:640px){.g2{grid-template-columns:1fr}.free{font-size:22px}th,td{padding:9px 5px}nav button{font-size:15px;padding:12px 4px}}
-@media(max-width:560px){.sale-line{grid-template-columns:44px minmax(0,1fr)}.sale-in{grid-column:2/-1;min-width:0}.sale-in input{flex:1;width:auto;min-width:0}}
-@media(max-width:560px){.l1{grid-template-columns:1fr 1fr 1.3fr 44px}.l1 select{grid-column:1/-1}.lhead{display:none}.sheet{margin:12px auto;padding:14px}}
+.sale-in input{width:96px}
+.ticket{border:2px dashed var(--fieldline);border-radius:16px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;background:var(--card)}
+.ticket span{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.ticket b{font:700 42px/1 var(--f-display);font-variant-numeric:tabular-nums}
+
+/* Statistik */
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.stat .card{margin:0;display:flex;flex-direction:column;gap:2px}
+.stat .card>span:first-child{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mute)}
+.stat b{display:block;font:700 36px/1.05 var(--f-display);font-variant-numeric:tabular-nums}
+
+@media(max-width:640px){.g2{grid-template-columns:1fr}th,td{padding:10px 5px}h2{font-size:27px}.tile .t-num{font-size:40px}}
+@media(max-width:560px){
+  .sheet{margin:auto 0 0;width:100%;border-radius:22px 22px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom,0px))}
+  .sheet::before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:var(--fieldline);margin:-6px auto 12px}
+  .dlg{margin:auto 0 0}
+  .sale-line{grid-template-columns:48px minmax(0,1fr)}.sale-in{grid-column:2/-1;min-width:0}.sale-in input{flex:1;width:auto;min-width:0}
+  .l1{grid-template-columns:1fr 1fr 1.3fr 46px}.l1 select{grid-column:1/-1}.lhead{display:none}
+  .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sheet .big{flex-basis:100%;order:-1}
+}
 </style>
 </head>
 <body>
 <header>
-  <div class="top"><h1>Geflügelliste</h1><span id="sync" class="sync local">Nur auf diesem Gerät</span></div>
-  <nav id="nav"></nav>
+  <div class="top"><svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c4.2 0 7.8 6.4 7.8 11.3a7.8 7.8 0 0 1-15.6 0C4.2 8.6 7.8 2.2 12 2.2z" fill="#f3b52f"/><ellipse cx="9.4" cy="9" rx="1.6" ry="2.4" fill="#fff" opacity=".45"/></svg><h1>Geflügelliste</h1><span id="sync" class="sync local">Nur auf diesem Gerät</span></div>
 </header>
 <main id="app"></main>
+<nav id="nav" class="tabbar" aria-label="Bereiche"></nav>
 <div id="modal"></div>
 <div id="dlg"></div>
 <input type="file" id="importFile" accept="application/json" hidden>
@@ -400,7 +501,7 @@ const ask = (t, v = '') => dialog(t, { input: v });
 /* Bestand eines Schlachttermins berechnen */
 function calc(batch, orders = batch.orders) {
   const s = sp(batch.speciesId);
-  const total = {}, used = {}, rem = {}, per = {}, avail = {};
+  const total = {}, used = {}, rem = {}, per = {}, avail = {}, util = {};
   s.parts.forEach(p => { total[p.id] = batch.count * p.perAnimal; used[p.id] = 0; });
   s.products.forEach(p => { per[p.id] = { res: 0, sold: 0 }; });
   orders.forEach(o => o.lines.forEach(l => {
@@ -414,8 +515,10 @@ function calc(batch, orders = batch.orders) {
   s.products.forEach(p => {
     const keys = Object.keys(p.uses).filter(k => k in rem && p.uses[k] > 0);
     avail[p.id] = keys.length ? Math.floor(Math.min(...keys.map(k => rem[k] / p.uses[k])) + 1e-9) : null;
+    /* wie weit das knappste Teil dieses Produkts schon verplant ist (0–1) */
+    util[p.id] = keys.length ? Math.max(...keys.map(k => total[k] ? used[k] / total[k] : 1)) : 0;
   });
-  return { total, used, rem, per, avail };
+  return { total, used, rem, per, avail, util };
 }
 /* Betrag einer Position: eingetragener Betrag > gewogenes Gewicht > Schätzung über Ø-Gewicht.
    est = true heißt geschätzt, none = true heißt kein Preis hinterlegt. */
@@ -440,9 +543,35 @@ const unitLabel = p => p.unit === 'stk' ? 'Stück' : 'kg';
 
 /* ---------- Rendering ---------- */
 const TABS = [['verkauf', 'Verkauf'], ['bestand', 'Bestand'], ['kunden', 'Kunden'], ['umsatz', 'Statistik'], ['einstellungen', 'Einstellungen']];
+const svg = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  verkauf: svg('<path d="M3.5 9.5h17l-1.6 9.2a1.5 1.5 0 0 1-1.5 1.3H6.6a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M8 9.5 12 4l4 5.5"/><path d="M9.5 13.5v3M14.5 13.5v3"/>'),
+  bestand: svg('<path d="M12 3 3.5 7.2 12 11.4l8.5-4.2z"/><path d="m3.5 12 8.5 4.2 8.5-4.2"/><path d="m3.5 16.8 8.5 4.2 8.5-4.2"/>'),
+  kunden: svg('<circle cx="9" cy="8" r="3.4"/><path d="M2.8 20c.8-3.4 3.3-5.4 6.2-5.4s5.4 2 6.2 5.4"/><path d="M15.5 4.8a3.3 3.3 0 0 1 0 6.4M17.6 14.9c1.9.7 3.1 2.5 3.6 5.1"/>'),
+  umsatz: svg('<path d="M4 20V11M10 20V5M16 20v-6M21 20H3"/>'),
+  einstellungen: svg('<path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1"/><circle cx="15" cy="6.5" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/>'),
+  search: svg('<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>'),
+  basket: svg('<path d="M3.5 9.5h17l-1.6 9.2a1.5 1.5 0 0 1-1.5 1.3H6.6a1.5 1.5 0 0 1-1.5-1.3z"/><path d="M8 9.5 12 4l4 5.5"/>'),
+  egg: svg('<path d="M12 3c3.9 0 7 5.9 7 10.4a7 7 0 0 1-14 0C5 8.9 8.1 3 12 3z"/>')
+};
+const emptyBox = (icon, text, extra = '') => `<div class="card empty">${ICON[icon]}${text}${extra}</div>`;
+/* Kunden-Kreis mit Anfangsbuchstabe; Farbe bleibt pro Name gleich */
+function avatar(name) {
+  let h = 0; for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `<span class="av a${h % 4}" aria-hidden="true">${esc((name.trim()[0] || '?').toUpperCase())}</span>`;
+}
+/* Positionen als kleine Etiketten: „2× Brust“, Gewicht, Hinweis */
+function itemChips(o, s) {
+  return o.lines.map(l => {
+    const p = s.products.find(x => x.id === l.productId);
+    const kg = l.kg !== '' && l.kg != null ? ` <i>${fmt(+l.kg)} kg</i>` : '';
+    const n = noteText(l);
+    return `<span class="ic"><b>${fmt(+l.qty || 0)}×</b> ${esc(p ? p.name : (l.text || 'Sonderwunsch'))}${kg}</span>${n ? `<span class="ic note">${esc(n)}</span>` : ''}`;
+  }).join('');
+}
 
 function render() {
-  $('nav').innerHTML = TABS.map(([k, n]) => `<button data-a="tab" data-v="${k}" class="${ui.tab === k ? 'on' : ''}">${n}</button>`).join('');
+  $('nav').innerHTML = `<div class="in">${TABS.map(([k, n]) => `<button data-a="tab" data-v="${k}" class="${ui.tab === k ? 'on' : ''}" ${ui.tab === k ? 'aria-current="page"' : ''}>${ICON[k]}<span>${n}</span></button>`).join('')}</div>`;
   pendingRender = false;
   if (DB && !loaded) { $('app').innerHTML = '<div class="card empty">Gemeinsame Daten werden geladen …</div>'; return; }
   const left = localLeftovers();
@@ -477,18 +606,20 @@ function viewVerkauf() {
     });
   });
   list.sort((x, y) => (x.o.status === 'sold') - (y.o.status === 'sold') || x.name.localeCompare(y.name, 'de'));
-  const cards = list.map(({ b, s, o, name }) => `<div class="card order pick" data-a="sale" data-v="${b.id}:${o.id}" data-name="${esc(name.toLowerCase())}">
+  const cards = list.map(({ b, s, o, name }) => `<div class="card order" data-a="sale" data-v="${b.id}:${o.id}" data-name="${esc(name.toLowerCase())}">
+      ${avatar(name)}
       <span class="name">${esc(name)}</span>
-      <span>${o.status === 'sold' ? '<span class="tag sold">Abgeholt</span>' : `<span class="mute">${esc(batchLabel(b))}</span>`}</span>
-      <span class="what">${o.lines.map(l => lineText(l, s) + (noteText(l) ? ` (${esc(noteText(l))})` : '')).join(', ')}</span>
+      <span class="right">${o.status === 'sold' ? '<span class="tag sold">Abgeholt</span>' : `<span class="sum">${money(orderVal(o, s))}</span>`}</span>
+      <span class="meta">${esc(batchLabel(b))}</span>
+      <div class="items">${itemChips(o, s)}</div>
     </div>`).join('');
   const open = list.filter(x => x.o.status !== 'sold').length;
-  return `<input class="search" id="v_q" type="search" placeholder="Name suchen …" autocomplete="off" value="${esc(ui.q)}">
-    <div class="chips">${chips}</div>
-    <div class="row" style="margin-bottom:10px"><span class="mute">${open} offene Bestellung${open === 1 ? '' : 'en'}</span><span class="sp"></span>
-      <button class="b sm" data-a="saledone">${ui.saleDone ? 'Abgeholte ausblenden' : 'Abgeholte zeigen'}</button></div>
-    <div id="v_list">${cards || '<div class="card empty">Keine offenen Bestellungen.</div>'}</div>
-    <div class="card empty" id="v_none" hidden>Niemand mit diesem Namen gefunden.</div>`;
+  return `<div class="phead"><div><div class="eyebrow">Abholung</div><h2>Wer kommt?</h2></div><span class="sp"></span>
+      <span class="sub">${open} offene Bestellung${open === 1 ? '' : 'en'}</span></div>
+    <div class="searchwrap">${ICON.search}<input class="search" id="v_q" type="search" placeholder="Name suchen …" autocomplete="off" value="${esc(ui.q)}" aria-label="Kundenname suchen"></div>
+    <div class="chips">${chips}<button class="chip ${ui.saleDone ? 'on' : ''}" data-a="saledone">${ui.saleDone ? '✓ ' : ''}Abgeholte zeigen</button></div>
+    <div id="v_list">${cards || emptyBox('basket', 'Keine offenen Bestellungen.')}</div>
+    <div id="v_none" hidden>${emptyBox('search', 'Niemand mit diesem Namen gefunden.')}</div>`;
 }
 function filterSale() {
   const q = ui.q.trim().toLowerCase(); let n = 0;
@@ -514,11 +645,12 @@ function drawSale() {
       <div class="sale-in">${kg}<input class="num" type="text" inputmode="decimal" data-f="price" value="${numVal(l.price)}" placeholder="${pricePh(l, s)}" aria-label="Betrag in Euro"></div>
     </div>`;
   }).join('');
-  openModal(`<div class="sale-name">${esc(cust(d.customerId)?.name || '?')}</div>
-    <div class="mute">${esc(batchLabel(b))} · ${d.status === 'sold' ? 'bereits abgeholt' : 'reserviert'}</div>
+  const name = cust(d.customerId)?.name || '?';
+  openModal(`<div class="row" style="gap:14px">${avatar(name)}<div class="sp" style="min-width:0"><div class="sale-name">${esc(name)}</div>
+    <div class="mute">${esc(batchLabel(b))} · ${d.status === 'sold' ? 'bereits abgeholt' : 'reserviert'}</div></div></div>
     ${d.note ? `<div class="sale-ordernote">${esc(d.note)}</div>` : ''}
-    <div style="margin-top:8px">${lines || '<div class="empty">Keine Positionen.</div>'}</div>
-    <div class="sale-total"><span>Summe</span><b id="o_sum"></b></div>
+    <div class="card" style="margin:14px 0 0;padding-block:4px">${lines || '<div class="empty">Keine Positionen.</div>'}</div>
+    <div class="ticket"><span>Summe</span><b id="o_sum"></b></div>
     <div class="mute">Gewicht oder Betrag nur eintragen, wenn gewogen wurde. Sonst gilt der geschätzte Preis (≈).</div>
     <div id="warn" hidden></div>
     <div class="row" style="margin-top:18px"><button class="b" data-a="saleedit">Bearbeiten</button><span class="sp"></span><button class="b" data-a="close">Zurück</button>
@@ -530,45 +662,49 @@ function viewBestand() {
   const batches = [...S.batches].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   if (!batches.find(b => b.id === ui.batchId)) ui.batchId = batches[0]?.id || null;
   const chips = batches.map(b => `<button class="chip ${b.id === ui.batchId ? 'on' : ''}" data-a="batch" data-v="${b.id}">${esc(sp(b.speciesId).name)} · ${dateDE(b.date)}</button>`).join('');
-  let html = `<div class="chips">${chips}<button class="chip" data-a="newbatch">＋ Neuer Schlachttermin</button></div>`;
+  let html = `<div class="phead"><div><div class="eyebrow">Schlachttermine</div><h2>Bestand</h2></div></div>
+    <div class="chips">${chips}<button class="chip add" data-a="newbatch">＋ Neuer Termin</button></div>`;
   const b = batchOf(ui.batchId);
-  if (!b) return html + `<div class="card empty">Noch kein Schlachttermin.<br><br><button class="b pri" data-a="newbatch">Ersten Schlachttermin anlegen</button></div>`;
+  if (!b) return html + emptyBox('egg', 'Noch kein Schlachttermin angelegt.', '<div style="margin-top:14px"><button class="b pri" data-a="newbatch">Ersten Schlachttermin anlegen</button></div>');
 
   const s = sp(b.speciesId), c = calc(b);
-  const rows = s.products.map(p => {
+  let nRes = 0, nSold = 0;
+  b.orders.forEach(o => o.status === 'sold' ? nSold++ : nRes++);
+  const tiles = s.products.map(p => {
     const a = c.avail[p.id], pr = c.per[p.id];
-    const cls = a === null ? '' : a < 0 ? 'neg' : a === 0 ? 'zero' : 'ok';
-    const txt = a === null ? '–' : a;
-    return `<tr><td><b>${esc(p.name)}</b></td><td class="n"><span class="free ${cls}">${txt}</span></td><td class="n">${fmt(pr.res)}</td><td class="n">${fmt(pr.sold)}</td><td class="n mute">${p.price ? eur(p.price) + '/' + unitLabel(p) : ''}</td></tr>`;
+    const cls = a === null ? 'na' : a < 0 ? 'neg' : a === 0 ? 'zero' : 'ok';
+    const num = a === null ? '–' : a;
+    const meta = [pr.res ? fmt(pr.res) + ' res.' : '', pr.sold ? fmt(pr.sold) + ' abgeh.' : ''].filter(Boolean).join(' · ');
+    return `<div class="tile ${cls}">
+      <span class="t-name">${esc(p.name)}</span>
+      <span class="t-num">${num}${a !== null ? `<small>${a < 0 ? 'zu viel' : 'frei'}</small>` : ''}</span>
+      <span class="t-sub">${meta || (p.price ? eur(p.price) + '/' + unitLabel(p) : '&nbsp;')}</span>
+      ${a !== null ? `<div class="meter" title="${Math.round(c.util[p.id] * 100)} % verplant"><i style="width:${Math.min(100, Math.round(c.util[p.id] * 100))}%"></i></div>` : ''}
+    </div>`;
   }).join('');
-  const parts = s.parts.map(p => `<span class="part ${c.rem[p.id] < -1e-9 ? 'neg' : ''}">${esc(p.name)}: ${fmt(c.rem[p.id])} von ${fmt(c.total[p.id])}</span>`).join('');
+  const parts = s.parts.map(p => `<span class="part ${c.rem[p.id] < -1e-9 ? 'neg' : ''}">${esc(p.name)} <b>${fmt(c.rem[p.id])}</b> / ${fmt(c.total[p.id])}</span>`).join('');
 
-  html += `<div class="card">
-    <div class="row"><h2 style="margin:0">${esc(s.name)} · ${dateDE(b.date)}</h2><span class="sp"></span>
-      <button class="b sm" data-a="editbatch">Bearbeiten</button></div>
-    <div class="mute">${b.count} geschlachtet${b.note ? ' · ' + esc(b.note) : ''}</div>
-    <table style="margin-top:8px"><tr><th>Produkt</th><th class="n">Noch frei</th><th class="n">Reserviert</th><th class="n">Verkauft</th><th class="n">Preis</th></tr>${rows}</table>
-    <h3>Teile übrig (zusammen)</h3><div class="parts">${parts}</div>
-  </div>`;
+  html += `<div class="card hero">
+      <div><div class="eyebrow">${dateDE(b.date)}</div><h2>${esc(s.name)}</h2></div>
+      <button class="b sm" data-a="editbatch">Bearbeiten</button>
+      <div class="facts"><div><b>${b.count}</b><span>geschlachtet</span></div><div><b>${nRes}</b><span>reserviert</span></div><div><b>${nSold}</b><span>abgeholt</span></div></div>
+      ${b.note ? `<div class="mute" style="grid-column:1/-1">${esc(b.note)}</div>` : ''}
+    </div>
+    <div class="tiles">${tiles}</div>
+    <h3>Teile übrig</h3><div class="parts">${parts}</div>`;
 
   const orders = [...b.orders].sort((x, y) => (x.status === 'sold') - (y.status === 'sold'));
-  html += `<div class="row" style="margin:6px 0 10px"><h2 style="margin:0">Bestellungen</h2><span class="sp"></span><button class="b pri" data-a="neworder">＋ Bestellung</button></div>`;
-  if (!orders.length) html += `<div class="card empty">Noch keine Bestellungen für diesen Termin.</div>`;
+  html += `<div class="row" style="margin:26px 0 12px"><h3 style="margin:0">Bestellungen</h3><span class="sp"></span><button class="b pri" data-a="neworder">＋ Bestellung</button></div>`;
+  if (!orders.length) html += emptyBox('basket', 'Noch keine Bestellungen für diesen Termin.');
   html += orders.map(o => {
-    const cu = cust(o.customerId);
-    const lines = o.lines.map(l => {
-      const p = s.products.find(x => x.id === l.productId);
-      const name = p ? p.name : (l.text || 'Sonderwunsch');
-      const kg = l.kg !== '' && l.kg != null ? ` <span class="mute">${fmt(+l.kg)} kg</span>` : '';
-      return `${fmt(+l.qty || 0)}× ${esc(name)}${kg}${noteText(l) ? ' <span class="mute">(' + esc(noteText(l)) + ')</span>' : ''}`;
-    }).join(', ');
+    const name = cust(o.customerId)?.name || '?';
     return `<div class="card order" data-a="editorder" data-v="${o.id}">
-      <div class="top"><span class="name">${esc(cu ? cu.name : '?')}</span>
-        <span class="tag ${o.status}">${o.status === 'sold' ? 'Abgeholt' : 'Reserviert'}</span><span class="sp"></span>
-        <span class="sum">${money(orderVal(o, s))}</span></div>
-      <div class="lines">${lines || '<span class="mute">keine Positionen</span>'}</div>
-      ${o.note ? `<div class="mute">📝 ${esc(o.note)}</div>` : ''}
-      ${o.status !== 'sold' ? `<div style="margin-top:8px"><button class="b sm pri" data-a="pickup" data-v="${o.id}">✓ Abholen</button></div>` : ''}
+      ${avatar(name)}
+      <span class="name">${esc(name)}</span>
+      <span class="right"><span class="sum">${money(orderVal(o, s))}</span><span class="tag ${o.status}">${o.status === 'sold' ? 'Abgeholt' : 'Reserviert'}</span></span>
+      <span class="meta">${o.lines.length} Position${o.lines.length === 1 ? '' : 'en'}</span>
+      <div class="items">${itemChips(o, s)}${o.note ? `<span class="ic note">${esc(o.note)}</span>` : ''}</div>
+      ${o.status !== 'sold' ? `<div class="foot"><button class="b sm pri" data-a="pickup" data-v="${o.id}">✓ Abholen</button></div>` : ''}
     </div>`;
   }).join('');
   return html;
@@ -582,11 +718,11 @@ function viewKunden() {
   }));
   const rows = [...S.customers].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(c => {
     const x = stats[c.id] || { n: 0, sum: 0 };
-    return `<tr><td><b>${esc(c.name)}</b></td><td class="n">${x.n}</td><td class="n">${x.sum ? eur(x.sum) : ''}</td>
-      <td class="n"><button class="b sm" data-a="editcust" data-v="${c.id}">Bearbeiten</button></td></tr>`;
+    return `<tr><td><div class="row" style="gap:12px;flex-wrap:nowrap">${avatar(c.name)}<b>${esc(c.name)}</b></div></td><td class="n">${x.n}</td><td class="n">${x.sum ? eur(x.sum) : ''}</td>
+      <td class="n"><button class="b sm" data-a="editcust" data-v="${c.id}">Ändern</button></td></tr>`;
   }).join('');
-  return `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">Stammkunden</h2><span class="sp"></span><button class="b pri" data-a="addcust">＋ Neuer Kunde</button></div>
-  <div class="card">${S.customers.length ? `<table><tr><th>Name</th><th class="n">Bestellungen</th><th class="n">Umsatz</th><th></th></tr>${rows}</table>` : '<div class="empty">Noch keine Kunden. Neue Kunden entstehen auch automatisch, wenn du bei einer Bestellung einen neuen Namen eintippst.</div>'}</div>`;
+  return `<div class="phead"><div><div class="eyebrow">${S.customers.length} Kunden</div><h2>Stammkunden</h2></div><span class="sp"></span><button class="b pri" data-a="addcust">＋ Neuer Kunde</button></div>
+  ${S.customers.length ? `<div class="card scroll"><table><tr><th>Name</th><th class="n">Bestell.</th><th class="n">Umsatz</th><th></th></tr>${rows}</table></div>` : emptyBox('kunden', 'Noch keine Kunden. Neue Kunden entstehen auch automatisch, wenn du bei einer Bestellung einen neuen Namen eintippst.')}`;
 }
 
 function viewUmsatz() {
@@ -634,16 +770,17 @@ function viewUmsatz() {
   const sumRow = byBatch.length > 1 ? `<tr style="font-weight:700"><td>Summe</td><td class="n">${byBatch.reduce((a, x) => a + x.b.count, 0)}</td><td></td><td class="n">${byBatch.reduce((a, x) => a + x.b.orders.length, 0)}</td><td class="n">${fmt(byBatch.reduce((a, x) => a + x.bPcs, 0))}</td><td class="n">${kgTxt(kgAll)}</td><td class="n">${eur(sold)}</td><td class="n">${open ? eur(open) : ''}</td></tr>` : '';
   const monthsObj = Object.fromEntries(Object.entries(byMonth).sort());
   const animalTxt = Object.entries(animals).map(([k, v]) => `${v} ${esc(k)}`).join(', ') || 'keine';
-  return `<div class="chips"><button class="chip ${ui.year === 'all' ? 'on' : ''}" data-a="year" data-v="all">Gesamt</button>${years.map(y => `<button class="chip ${ui.year === y ? 'on' : ''}" data-a="year" data-v="${y}">${y}</button>`).join('')}</div>
+  return `<div class="phead"><div><div class="eyebrow">Auswertung</div><h2>Statistik</h2></div></div>
+  <div class="chips"><button class="chip ${ui.year === 'all' ? 'on' : ''}" data-a="year" data-v="all">Gesamt</button>${years.map(y => `<button class="chip ${ui.year === y ? 'on' : ''}" data-a="year" data-v="${y}">${y}</button>`).join('')}</div>
   <div class="stat"><div class="card"><span class="mute">Umsatz (abgeholt)</span><b>${eur(sold)}</b>${soldEst ? `<span class="mute">davon geschätzt ${eur(soldEst)}</span>` : ''}</div>
   <div class="card"><span class="mute">Noch offen (reserviert, geschätzt)</span><b>${eur(open)}</b></div>
   <div class="card"><span class="mute">Schlachtungen</span><b>${bs.length}</b><span class="mute">${animalTxt}</span></div>
   <div class="card"><span class="mute">Gewogen (abgeholt)</span><b>${kgAll ? fmt(kgAll) + ' kg' : '–'}</b><span class="mute">${nOrders} abgeholte Bestellungen</span></div></div>
   ${noPrice ? `<div class="warn">⚠ ${noPrice} abgeholte Position(en) ohne Preis – bitte Preise unter Einstellungen eintragen (und Ø-Gewicht für die Schätzung).</div>` : ''}
-  <div class="card"><h3 style="margin-top:0">Alle Schlachtungen</h3><div class="mute">„Verplant“ zeigt das knappste Teil: so viel davon ist reserviert oder abgeholt. 100 % heißt, es ist ausverkauft.</div>${batchRows ? `<div class="scroll"><table><tr><th>Termin</th><th class="n">Tiere</th><th class="n">Verplant</th><th class="n">Bestell.</th><th class="n">Stück abgeh.</th><th class="n">Gewogen</th><th class="n">Umsatz</th><th class="n">Offen</th></tr>${batchRows}${sumRow}</table></div>` : '<div class="empty">Noch keine Termine.</div>'}</div>
-  <div class="card"><h3 style="margin-top:0">Pro Produkt</h3><div class="mute">Ø Gewicht zählt nur Stücke, die gewogen wurden.</div>${prodRows ? `<div class="scroll"><table><tr><th>Produkt</th><th class="n">Reserviert</th><th class="n">Abgeholt</th><th class="n">Gewogen</th><th class="n">Ø pro Stück</th><th class="n">Umsatz</th></tr>${prodRows}</table></div>` : '<div class="empty">Noch keine Bestellungen.</div>'}</div>
-  <div class="card"><h3 style="margin-top:0">Pro Kunde</h3>${bars(byCust)}</div>
-  <div class="card"><h3 style="margin-top:0">Pro Monat</h3>${bars(monthsObj, monthName)}</div>`;
+  <div class="card"><h3 style="margin:0 0 10px">Alle Schlachtungen</h3><div class="mute">„Verplant“ zeigt das knappste Teil: so viel davon ist reserviert oder abgeholt. 100 % heißt, es ist ausverkauft.</div>${batchRows ? `<div class="scroll"><table><tr><th>Termin</th><th class="n">Tiere</th><th class="n">Verplant</th><th class="n">Bestell.</th><th class="n">Stück abgeh.</th><th class="n">Gewogen</th><th class="n">Umsatz</th><th class="n">Offen</th></tr>${batchRows}${sumRow}</table></div>` : '<div class="empty">Noch keine Termine.</div>'}</div>
+  <div class="card"><h3 style="margin:0 0 10px">Pro Produkt</h3><div class="mute">Ø Gewicht zählt nur Stücke, die gewogen wurden.</div>${prodRows ? `<div class="scroll"><table><tr><th>Produkt</th><th class="n">Reserviert</th><th class="n">Abgeholt</th><th class="n">Gewogen</th><th class="n">Ø pro Stück</th><th class="n">Umsatz</th></tr>${prodRows}</table></div>` : '<div class="empty">Noch keine Bestellungen.</div>'}</div>
+  <div class="card"><h3 style="margin:0 0 10px">Pro Kunde</h3>${bars(byCust)}</div>
+  <div class="card"><h3 style="margin:0 0 10px">Pro Monat</h3>${bars(monthsObj, monthName)}</div>`;
 }
 
 function viewSettings() {
@@ -666,7 +803,7 @@ function viewSettings() {
       <div class="scroll"><table><tr><th>Produkt</th><th class="n">Preis €</th><th>Einheit</th><th class="n">Ø kg/Stück</th>${head}<th></th></tr>${prodRows}</table></div>
       <button class="b sm" data-a="addprod" data-s="${s.id}" style="margin-top:8px">＋ Produkt</button></div>`;
   }).join('');
-  return `<h2>Einstellungen</h2>
+  return `<div class="phead"><div><div class="eyebrow">Tiere, Teile, Preise</div><h2>Einstellungen</h2></div></div>
   <div class="card set"><div class="row"><b class="sp">Aufpreis Marinade (€ pro kg)</b><input class="num" style="max-width:120px" inputmode="decimal" data-c="marinade" value="${String(+S.marinade || 0).replace('.', ',')}"></div></div>
   ${speciesHtml}
   <div class="row"><button class="b" data-a="addspecies">＋ Neue Tierart</button></div>
