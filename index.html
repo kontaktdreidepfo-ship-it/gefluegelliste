@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Geflügelliste">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2f6b3a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Geflügelliste</title>
+<style>
+/* Hofladen-Werkzeug: grüne Kopfleiste mit Reitern, darunter Karten in einer Spalte, große Zahlen für „noch frei“ */
+:root{
+  --bg:#eef1ea; --card:#fff; --field:#fff; --soft:#e6eadf; --ink:#1f2a1f; --mute:#5f6b5c; --line:#d9dfd2; --fieldline:#c3cbbb;
+  --green:#2f6b3a; --ongreen:#fff; --navmute:#cfe3d2; --greenbg:#dfeee1; --red:#b3261e; --redbg:#fbe4e1; --redline:#e8bdb8; --amber:#a35f00; --amberbg:#fcefd4;
+  --r:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121712; --card:#1b221b; --field:#222a22; --soft:#263026; --ink:#e7eee4; --mute:#a3b0a0; --line:#2f3a2f; --fieldline:#3d4a3d;
+  --green:#3f8a4d; --ongreen:#fff; --navmute:#cfe3d2; --greenbg:#1f3523; --red:#ff8a7f; --redbg:#3b1d1a; --redline:#6b2f29; --amber:#f0b04a; --amberbg:#3a2c12;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#121712; --card:#1b221b; --field:#222a22; --soft:#263026; --ink:#e7eee4; --mute:#a3b0a0; --line:#2f3a2f; --fieldline:#3d4a3d;
+  --green:#3f8a4d; --ongreen:#fff; --navmute:#cfe3d2; --greenbg:#1f3523; --red:#ff8a7f; --redbg:#3b1d1a; --redline:#6b2f29; --amber:#f0b04a; --amberbg:#3a2c12;
+  color-scheme:dark;
+}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--green)}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--green);color:var(--ongreen);padding-block:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header h1{font-size:20px;margin:0;padding:12px 0 8px}
+header .top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sync{margin-left:auto;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px;background:rgba(255,255,255,.16);color:var(--ongreen)}
+.sync::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#cfd8cc;vertical-align:1px}
+.sync.live::before{background:#7ee08f}
+.sync.loading::before{background:#f2c14e}
+.sync.error::before{background:#ff8a7f}
+.banner{border-color:var(--amber);background:var(--amberbg);color:var(--ink)}
+nav{display:flex;gap:4px;overflow-x:auto}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+nav button{flex:1;min-width:72px;background:none;border:0;color:var(--navmute);font-weight:600;font-size:16px;font-family:inherit;padding:12px 8px;border-bottom:4px solid transparent;cursor:pointer}
+nav button.on{color:var(--ongreen);border-bottom-color:var(--ongreen)}
+main{max-width:1000px;margin:0 auto;padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+h2{font-size:22px;margin:4px 0 12px}
+h3{font-size:18px;margin:20px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.mute{color:var(--mute);font-size:15px}
+button.b{font-weight:600;font-size:16px;font-family:inherit;border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:12px;padding:11px 16px;min-height:44px;cursor:pointer}
+button.b.pri{background:var(--green);border-color:var(--green);color:var(--ongreen)}
+button.b.dan{color:var(--red);border-color:var(--redline)}
+button.b.sm{padding:6px 12px;min-height:36px;font-size:15px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+.chip{flex:none;border:1px solid var(--line);background:var(--field);border-radius:999px;padding:9px 16px;font-weight:600;font-size:15px;font-family:inherit;cursor:pointer;color:var(--ink)}
+.chip.on{background:var(--green);color:var(--ongreen);border-color:var(--green)}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:14px;color:var(--mute);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.free{font-size:26px;font-weight:700}
+.free.ok{color:var(--green)} .free.zero{color:var(--amber)} .free.neg{color:var(--red)}
+.tag{display:inline-block;border-radius:999px;padding:3px 11px;font-size:14px;font-weight:600}
+.tag.res{background:var(--amberbg);color:var(--amber)}
+.tag.sold{background:var(--greenbg);color:var(--green)}
+.parts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.part{background:var(--soft);border-radius:10px;padding:6px 11px;font-size:15px}
+.part.neg{background:var(--redbg);color:var(--red);font-weight:600}
+.order{cursor:pointer}
+.order .top{display:flex;gap:10px;align-items:center}
+.order .name{font-weight:700;font-size:18px}
+.order .lines{margin-top:4px}
+.order .sum{font-weight:700;font-variant-numeric:tabular-nums}
+.empty{text-align:center;color:var(--mute);padding:34px 10px}
+input,select,textarea{font-size:17px;font-family:inherit;border:1px solid var(--fieldline);border-radius:10px;padding:10px 12px;min-height:44px;background:var(--field);color:var(--ink);width:100%}
+input[type=number],input.num{text-align:right}
+label{display:block;font-size:14px;color:var(--mute);font-weight:600;margin:12px 0 4px}
+.grid{display:grid;gap:10px}
+.g2{grid-template-columns:1fr 1fr}
+#modal{position:fixed;inset:0;background:rgba(20,25,18,.5);display:none;z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#modal.show,#dlg.show{display:block}
+#dlg{position:fixed;inset:0;background:rgba(10,14,10,.55);display:none;z-index:30;padding-top:env(safe-area-inset-top,0px)}
+.dlg{max-width:440px;margin-top:18vh}
+.dlg p{margin:0 0 12px;font-size:18px}
+.sheet{background:var(--bg);max-width:720px;margin:24px auto;border-radius:18px;padding:18px;width:calc(100% - 24px)}
+.line{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+.l1{display:grid;grid-template-columns:1fr 72px 84px 112px 44px;gap:8px;align-items:center}
+.lhead{font-size:13px;color:var(--mute);font-weight:600;padding:0 11px 4px}
+.lhead span:nth-child(n+2){text-align:right}
+.warn{background:var(--redbg);color:var(--red);border-radius:10px;padding:10px 12px;margin:10px 0;font-weight:600}
+.stat{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.stat .card{flex:1;min-width:180px;margin:0}
+.stat b{display:block;font-size:28px}
+.bar{height:12px;background:var(--greenbg);border-radius:6px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--green)}
+.set td input{padding:8px;min-height:40px}
+.scroll{overflow-x:auto}
+.scroll table th,.scroll table td{white-space:nowrap}
+.search{font-size:19px;padding:12px 14px;margin-bottom:12px}
+.pick{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center}
+.pick .name{font-weight:700;font-size:20px}
+.pick .what{grid-column:1/-1;color:var(--mute);font-size:15px}
+.sale-name{font-size:26px;font-weight:700;text-wrap:balance}
+.sale-ordernote{background:var(--amberbg);color:var(--amber);border-radius:10px;padding:8px 12px;margin-top:10px;font-weight:600}
+.sale-line{display:grid;grid-template-columns:58px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.sale-q{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--green)}
+.sale-p{min-width:0}
+.sale-p b{font-size:21px}
+.sale-note{display:inline-block;margin-top:4px;background:var(--amberbg);color:var(--amber);border-radius:8px;padding:2px 9px;font-weight:600;font-size:15px}
+.sale-in{display:flex;gap:6px}
+.sale-in input{width:92px}
+.sale-total{display:flex;justify-content:space-between;align-items:baseline;font-size:20px;padding:16px 0 4px}
+.sale-total b{font-size:30px;font-variant-numeric:tabular-nums}
+.chk{display:flex;gap:10px;align-items:center;margin:10px 0 0;color:var(--ink);font-size:16px;font-weight:500}
+.chk input{width:24px;height:24px;min-height:24px;accent-color:var(--green)}
+.big{font-size:19px;padding:14px 22px;min-height:54px}
+@media(max-width:640px){.g2{grid-template-columns:1fr}.free{font-size:22px}th,td{padding:9px 5px}nav button{font-size:15px;padding:12px 4px}}
+@media(max-width:560px){.sale-line{grid-template-columns:44px minmax(0,1fr)}.sale-in{grid-column:2/-1;min-width:0}.sale-in input{flex:1;width:auto;min-width:0}}
+@media(max-width:560px){.l1{grid-template-columns:1fr 1fr 1.3fr 44px}.l1 select{grid-column:1/-1}.lhead{display:none}.sheet{margin:12px auto;padding:14px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><h1>Geflügelliste</h1><span id="sync" class="sync local">Nur auf diesem Gerät</span></div>
+  <nav id="nav"></nav>
+</header>
+<main id="app"></main>
+<div id="modal"></div>
+<div id="dlg"></div>
+<input type="file" id="importFile" accept="application/json" hidden>
+
+<script>
+'use strict';
+const KEY = 'gefluegel-v1';
+const uid = () => Math.random().toString(36).slice(2, 9);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+
+/* ---------- Standarddaten ---------- */
+function seed() {
+  const P = (id, name, uses, price = 0) => ({ id, name, uses, price, unit: 'kg', avgKg: 0 });
+  return {
+    version: 1,
+    species: [
+      {
+        id: 'haehnchen', name: 'Hähnchen',
+        parts: [
+          { id: 'brust', name: 'Brust', perAnimal: 2 },
+          { id: 'keule', name: 'Keule', perAnimal: 2 },
+          { id: 'fluegel', name: 'Flügel', perAnimal: 2 },
+          { id: 'karkasse', name: 'Karkasse', perAnimal: 1 },
+          { id: 'innereien', name: 'Innereien', perAnimal: 1 }
+        ],
+        products: [
+          P('ganz', 'Ganz', { brust: 2, keule: 2, fluegel: 2 }, 8),
+          P('halb', 'Halb', { brust: 1, keule: 1, fluegel: 1 }, 8.5),
+          P('brust', 'Brust', { brust: 1 }, 12),
+          P('keule', 'Keule', { keule: 1 }, 10),
+          P('fluegel', 'Flügel', { fluegel: 1 }, 6),
+          P('karkasse', 'Karkasse', { karkasse: 1 }),
+          P('innereien', 'Innereien', { innereien: 1 }),
+          P('suppenhuhn', 'Suppenhuhn', {})
+        ]
+      },
+      {
+        id: 'pute', name: 'Pute',
+        parts: [
+          { id: 'brust', name: 'Brust', perAnimal: 2 },
+          { id: 'oberkeule', name: 'Oberkeule', perAnimal: 2 },
+          { id: 'unterkeule', name: 'Unterkeule', perAnimal: 2 },
+          { id: 'fluegel', name: 'Flügel', perAnimal: 2 },
+          { id: 'karkasse', name: 'Karkasse', perAnimal: 1 },
+          { id: 'innereien', name: 'Innereien', perAnimal: 1 }
+        ],
+        products: [
+          P('ganz', 'Ganz', { brust: 2, oberkeule: 2, unterkeule: 2, fluegel: 2 }, 9.5),
+          P('halb', 'Halb', { brust: 1, oberkeule: 1, unterkeule: 1, fluegel: 1 }, 10),
+          P('brust', 'Bruststück', { brust: 1 }, 16),
+          P('schnitzel', 'Schnitzel', { brust: 1 / 6 }),
+          P('oberkeule', 'Oberkeule', { oberkeule: 1 }, 15),
+          P('unterkeule', 'Unterkeule', { unterkeule: 1 }, 11),
+          P('fluegel', 'Flügel', { fluegel: 1 }, 9),
+          P('gulasch', 'Gulasch', {}, 19),
+          P('karkasse', 'Karkasse', { karkasse: 1 }),
+          P('innereien', 'Innereien', { innereien: 1 })
+        ]
+      },
+      {
+        id: 'gans', name: 'Gans',
+        parts: [{ id: 'gans', name: 'Gans', perAnimal: 1 }],
+        products: [P('ganz', 'Ganz', { gans: 1 }, 17)]
+      }
+    ],
+    marinade: 0.5,
+    prices: 1,
+    customers: [],
+    batches: []
+  };
+}
+
+/* ---------- Speicher ---------- */
+function load() {
+  try { const j = localStorage.getItem(KEY); if (j) return normalize(JSON.parse(j)); } catch (e) {}
+  return seed();
+}
+/* ältere Datenstände auf das aktuelle Format bringen */
+function normalize(d) {
+  if (!d.prices) addPriceList(d);
+  d.marinade ??= 0.5;
+  d.species.forEach(s => s.products.forEach(p => { p.unit ||= 'kg'; p.avgKg ||= 0; }));
+  d.batches.forEach(b => b.orders.forEach(o => o.lines.forEach(l => { l.kg ??= ''; })));
+  return d;
+}
+/* Einmalig: Preisliste und neue Produkte/Tierarten in schon vorhandene Daten übernehmen,
+   ohne selbst eingetragene Preise oder Namen zu überschreiben */
+function addPriceList(d) {
+  seed().species.forEach(ns => {
+    const s = d.species.find(x => x.id === ns.id);
+    if (!s) { d.species.push(ns); return; }
+    const newParts = ns.parts.filter(np => !s.parts.some(p => p.id === np.id));
+    s.parts.push(...newParts);
+    ns.products.forEach(np => {
+      const p = s.products.find(x => x.id === np.id);
+      if (!p) { s.products.push(np); return; }
+      if (!p.price) p.price = np.price;
+      newParts.forEach(pt => { if (np.uses[pt.id]) p.uses[pt.id] = np.uses[pt.id]; });
+    });
+  });
+  d.prices = 1;
+}
+/* ---------- Gemeinsame Datenbank ----------
+   Auf claude.ai liegen die Daten in der Datenbank des Links: alle Geräte sehen dasselbe, live.
+   Sonst (lokal geöffnet / als Home-Bildschirm-App) nur im Browser dieses Geräts.
+   Aufbau: config/main (Tierarten, Produkte, Preise), customers/<id>, batches/<id>, orders/<id>.
+   save() vergleicht den aktuellen Stand mit dem zuletzt bekannten und schreibt nur geänderte Dokumente. */
+let DB = null, loaded = false, sync = 'local', syncMsg = '', pendingRender = false;
+const COLLS = ['config', 'customers', 'batches', 'orders'];
+const snaps = Object.fromEntries(COLLS.map(c => [c, null]));
+const remote = new Map();   // Pfad -> JSON, wie in der Datenbank (bzw. gerade geschrieben)
+const chains = new Map();   // Pfad -> laufender Schreibvorgang (pro Dokument immer nur einer)
+
+/* JSON mit sortierten Schlüsseln, damit gleicher Inhalt immer gleich aussieht */
+const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
+  : v && typeof v === 'object' ? '{' + Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}'
+  : JSON.stringify(v ?? null);
+
+function docsOf(d) {
+  const m = new Map();
+  m.set('config/main', { species: d.species, marinade: d.marinade, prices: d.prices || 1 });
+  d.customers.forEach(c => m.set('customers/' + c.id, { name: c.name }));
+  d.batches.forEach(b => {
+    const { orders, id, ...rest } = b;
+    m.set('batches/' + id, rest);
+    orders.forEach(o => { const { id: oid, ...ob } = o; m.set('orders/' + oid, { ...ob, batchId: id }); });
+  });
+  return m;
+}
+function buildState() {
+  const clone = x => JSON.parse(JSON.stringify(x));
+  const cfg = snaps.config.get('main');
+  const d = { version: 1, ...(cfg ? clone(cfg) : { species: seed().species, marinade: 0.5, prices: 1 }), customers: [], batches: [] };
+  snaps.customers.forEach((c, id) => d.customers.push({ id, name: c.name }));
+  snaps.batches.forEach((b, id) => d.batches.push({ id, ...clone(b), orders: [] }));
+  const orders = [...snaps.orders].sort((a, b) => (a[1].t || 0) - (b[1].t || 0));
+  orders.forEach(([id, o]) => {
+    const b = d.batches.find(x => x.id === o.batchId);
+    if (b) { const { batchId, ...rest } = clone(o); b.orders.push({ id, ...rest }); }
+  });
+  return normalize(d);
+}
+
+function save() {
+  if (!DB) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} return; }
+  if (!loaded) return;   // nie schreiben, bevor die gemeinsamen Daten da sind
+  const docs = docsOf(S);
+  docs.forEach((body, path) => {
+    const j = stable(body);
+    if (remote.get(path) !== j) { remote.set(path, j); writeDoc(path, body); }
+  });
+  [...remote.keys()].forEach(path => { if (!docs.has(path)) { remote.delete(path); writeDoc(path, null); } });
+}
+function writeDoc(path, body, retry = true) {
+  const run = () => body === null ? DB.doc(path).delete() : DB.doc(path).set(JSON.parse(JSON.stringify(body)));
+  const p = (chains.get(path) || Promise.resolve()).then(run).catch(async err => {
+    if (retry && (!err?.code || err.code === 'unavailable')) {
+      await new Promise(r => setTimeout(r, 500 + Math.random() * 1000));
+      return run().catch(e => syncError(e));
+    }
+    syncError(err);
+  });
+  chains.set(path, p);
+}
+function syncError(err) {
+  const c = err?.code;
+  syncMsg = c === 'invalid_argument' ? 'Speichern nicht erlaubt: Du hast für diesen Link nur Leserechte. Der Besitzer muss dich als Mitwirkende/n freigeben.'
+    : c === 'quota_exceeded' ? 'Die Datenbank ist voll. Bitte alte Schlachttermine löschen.'
+    : c === 'revoked' ? 'Der Zugriff auf die gemeinsamen Daten wurde beendet. Bitte die Seite neu laden.'
+    : 'Speichern hat nicht geklappt. Bitte Internetverbindung prüfen und die Seite neu laden.';
+  setSync('error');
+}
+function setSync(s) { sync = s; drawSync(); scheduleRender(); }
+function drawSync() {
+  const t = { local: 'Nur auf diesem Gerät', loading: 'Lädt …', live: 'Alle Geräte verbunden', error: 'Fehler beim Speichern' }[sync];
+  if ($('sync')) { $('sync').textContent = t; $('sync').className = 'sync ' + sync; }
+}
+/* Daten von außen nicht neu zeichnen, während jemand in ein Feld tippt */
+function scheduleRender() {
+  const a = document.activeElement;
+  if (a && $('app').contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) { pendingRender = true; return; }
+  render();
+}
+async function initSync() {
+  if (!window.claude?.use) return;
+  const db = await window.claude.use('db');
+  if (!db) return;
+  DB = db; setSync('loading');
+  COLLS.forEach(c => db.collection(c).onSnapshot(snap => {
+    snaps[c] = new Map(snap.docs.map(d => [d.id, d.data()]));
+    if (COLLS.some(x => !snaps[x])) return;
+    remote.clear();
+    COLLS.forEach(x => snaps[x].forEach((body, id) => remote.set(x + '/' + id, stable(body))));
+    S = buildState();
+    if (!loaded) { loaded = true; ui.batchId = null; }
+    if (sync !== 'error') sync = 'live';
+    drawSync(); scheduleRender();
+  }, err => syncError(err)));
+}
+
+/* Daten aus der früheren Version (nur im Browser gespeichert) in die gemeinsamen Daten übernehmen */
+function localLeftovers() {
+  if (!DB || !loaded) return null;
+  let L = null;
+  try { if (localStorage.getItem(KEY + '-moved')) return null; L = JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; }
+  if (!L || !L.batches || !L.customers) return null;
+  const nb = L.batches.filter(b => !S.batches.some(x => x.id === b.id)).length;
+  const nc = L.customers.filter(c => !S.customers.some(x => x.id === c.id || x.name.toLowerCase() === c.name.toLowerCase())).length;
+  return nb || nc ? { L: normalize(L), nb, nc } : null;
+}
+function mergeLocal(L) {
+  if (!snaps.config.get('main')) { S.species = L.species; S.marinade = L.marinade; }
+  const idMap = {};
+  L.customers.forEach(c => { idMap[c.id] = resolveCustomer(c.name); });
+  L.batches.forEach(b => {
+    if (S.batches.some(x => x.id === b.id)) return;
+    b.orders.forEach((o, i) => { o.customerId = idMap[o.customerId] || o.customerId; o.t ??= Date.now() + i; });
+    S.batches.push(b);
+  });
+  save();
+  try { localStorage.setItem(KEY + '-moved', '1'); } catch (e) {}
+}
+
+let S = load();
+let ui = { tab: 'verkauf', batchId: null, year: 'all', modal: null, q: '', saleBatch: 'all', saleDone: false };
+
+/* ---------- Hilfsfunktionen ---------- */
+const sp = id => S.species.find(s => s.id === id);
+const cust = id => S.customers.find(c => c.id === id);
+const batchOf = id => S.batches.find(b => b.id === id);
+const fmt = n => (Math.round(n * 100) / 100).toLocaleString('de-DE');
+const eur = n => (n || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+function fmtAmt(n) {
+  if (Number.isInteger(n)) return String(n);
+  for (let d = 2; d <= 12; d++) { const x = n * d; if (Math.abs(x - Math.round(x)) < 1e-9 && Math.round(x) !== 0) return Math.round(x) + '/' + d; }
+  return String(Math.round(n * 1000) / 1000).replace('.', ',');
+}
+function parseAmt(s) {
+  s = String(s).trim().replace(',', '.');
+  if (s.includes('/')) { const [a, b] = s.split('/'); return (+a) / (+b) || 0; }
+  return +s || 0;
+}
+const parseNum = s => +String(s).trim().replace(',', '.') || 0;
+const dateDE = d => d ? new Date(d + 'T12:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+const today = () => new Date().toISOString().slice(0, 10);
+
+/* Eigene Dialoge statt alert/confirm/prompt – die sind in eingebetteten Ansichten (z. B. claude.ai) gesperrt */
+function dialog(text, { input = null, ok = 'OK', cancel = 'Abbrechen', danger = false } = {}) {
+  return new Promise(res => {
+    const el = $('dlg');
+    el.innerHTML = `<div class="sheet dlg"><p>${esc(text)}</p>${input !== null ? `<input id="dlg_in" value="${esc(input)}">` : ''}
+      <div class="row" style="margin-top:16px"><span class="sp"></span>${cancel ? `<button class="b" id="dlg_no">${cancel}</button>` : ''}<button class="b ${danger ? 'dan' : 'pri'}" id="dlg_ok">${ok}</button></div></div>`;
+    el.classList.add('show');
+    const inp = $('dlg_in');
+    const done = yes => { const v = inp ? inp.value : true; el.classList.remove('show'); el.innerHTML = ''; res(yes ? v : (inp ? null : false)); };
+    $('dlg_ok').onclick = () => done(true);
+    if (cancel) $('dlg_no').onclick = () => done(false);
+    if (inp) { inp.focus(); inp.onkeydown = e => { if (e.key === 'Enter') done(true); }; }
+  });
+}
+const say = t => dialog(t, { cancel: null });
+const sure = t => dialog(t, { ok: 'Ja', danger: true });
+const ask = (t, v = '') => dialog(t, { input: v });
+
+/* Bestand eines Schlachttermins berechnen */
+function calc(batch, orders = batch.orders) {
+  const s = sp(batch.speciesId);
+  const total = {}, used = {}, rem = {}, per = {}, avail = {};
+  s.parts.forEach(p => { total[p.id] = batch.count * p.perAnimal; used[p.id] = 0; });
+  s.products.forEach(p => { per[p.id] = { res: 0, sold: 0 }; });
+  orders.forEach(o => o.lines.forEach(l => {
+    const p = s.products.find(x => x.id === l.productId);
+    if (!p) return;
+    const q = +l.qty || 0;
+    per[p.id][o.status === 'sold' ? 'sold' : 'res'] += q;
+    for (const k in p.uses) if (k in used) used[k] += q * p.uses[k];
+  }));
+  s.parts.forEach(p => { rem[p.id] = total[p.id] - used[p.id]; });
+  s.products.forEach(p => {
+    const keys = Object.keys(p.uses).filter(k => k in rem && p.uses[k] > 0);
+    avail[p.id] = keys.length ? Math.floor(Math.min(...keys.map(k => rem[k] / p.uses[k])) + 1e-9) : null;
+  });
+  return { total, used, rem, per, avail };
+}
+/* Betrag einer Position: eingetragener Betrag > gewogenes Gewicht > Schätzung über Ø-Gewicht.
+   est = true heißt geschätzt, none = true heißt kein Preis hinterlegt. */
+function lineVal(l, s) {
+  if (l.price !== '' && l.price != null) return { v: +l.price || 0, est: false };
+  const p = s.products.find(x => x.id === l.productId);
+  if (!p || !p.price) return { v: 0, est: false, none: true };
+  const price = p.price + (l.mar ? +S.marinade || 0 : 0);
+  if (p.unit === 'stk') return { v: price * (+l.qty || 0), est: false };
+  if (l.kg !== '' && l.kg != null) return { v: price * (+l.kg || 0), est: false };
+  if (p.avgKg) return { v: price * p.avgKg * (+l.qty || 0), est: true };
+  return { v: 0, est: false, none: true };
+}
+const r2 = n => Math.round(n * 100) / 100;
+function orderVal(o, s) {
+  let v = 0, est = false;
+  o.lines.forEach(l => { const x = lineVal(l, s); v += x.v; est ||= x.est; });
+  return { v: r2(v), est };
+}
+const money = x => x.v ? (x.est ? '≈ ' : '') + eur(x.v) : '';
+const unitLabel = p => p.unit === 'stk' ? 'Stück' : 'kg';
+
+/* ---------- Rendering ---------- */
+const TABS = [['verkauf', 'Verkauf'], ['bestand', 'Bestand'], ['kunden', 'Kunden'], ['umsatz', 'Statistik'], ['einstellungen', 'Einstellungen']];
+
+function render() {
+  $('nav').innerHTML = TABS.map(([k, n]) => `<button data-a="tab" data-v="${k}" class="${ui.tab === k ? 'on' : ''}">${n}</button>`).join('');
+  pendingRender = false;
+  if (DB && !loaded) { $('app').innerHTML = '<div class="card empty">Gemeinsame Daten werden geladen …</div>'; return; }
+  const left = localLeftovers();
+  const banner = (sync === 'error' ? `<div class="warn">${esc(syncMsg)}</div>` : '') +
+    (left ? `<div class="card banner"><b>Auf diesem Gerät liegen noch Daten aus der früheren Version</b> (${left.nb} Schlachttermin${left.nb === 1 ? '' : 'e'}, ${left.nc} Kunde${left.nc === 1 ? '' : 'n'}). Sollen sie in die gemeinsamen Daten übernommen werden?
+      <div class="row" style="margin-top:10px"><button class="b pri" data-a="migrate">Übernehmen</button><button class="b" data-a="droplocal">Nicht übernehmen</button></div></div>` : '');
+  $('app').innerHTML = banner + ({ verkauf: viewVerkauf, bestand: viewBestand, kunden: viewKunden, umsatz: viewUmsatz, einstellungen: viewSettings })[ui.tab]();
+  if (ui.tab === 'verkauf') filterSale();
+}
+
+const noteText = l => [l.mar ? 'mariniert' : '', l.note].filter(Boolean).join(', ');
+const batchLabel = b =>`${sp(b.speciesId).name} · ${dateDE(b.date)}`;
+function lineText(l, s) {
+  const p = s.products.find(x => x.id === l.productId);
+  return `${fmt(+l.qty || 0)}× ${esc(p ? p.name : (l.text || 'Sonderwunsch'))}`;
+}
+
+/* Verkauf: Kunde kommt -> Namen suchen -> Bestellung antippen */
+function viewVerkauf() {
+  const withOpen = S.batches.filter(b => b.orders.some(o => o.status !== 'sold'))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (ui.saleBatch !== 'all' && !batchOf(ui.saleBatch)) ui.saleBatch = 'all';
+  const chips = `<button class="chip ${ui.saleBatch === 'all' ? 'on' : ''}" data-a="salebatch" data-v="all">Alle Termine</button>` +
+    withOpen.map(b => `<button class="chip ${ui.saleBatch === b.id ? 'on' : ''}" data-a="salebatch" data-v="${b.id}">${esc(batchLabel(b))}</button>`).join('');
+  const list = [];
+  S.batches.forEach(b => {
+    if (ui.saleBatch !== 'all' && b.id !== ui.saleBatch) return;
+    const s = sp(b.speciesId);
+    b.orders.forEach(o => {
+      if (o.status === 'sold' && !ui.saleDone) return;
+      list.push({ b, s, o, name: cust(o.customerId)?.name || '?' });
+    });
+  });
+  list.sort((x, y) => (x.o.status === 'sold') - (y.o.status === 'sold') || x.name.localeCompare(y.name, 'de'));
+  const cards = list.map(({ b, s, o, name }) => `<div class="card order pick" data-a="sale" data-v="${b.id}:${o.id}" data-name="${esc(name.toLowerCase())}">
+      <span class="name">${esc(name)}</span>
+      <span>${o.status === 'sold' ? '<span class="tag sold">Abgeholt</span>' : `<span class="mute">${esc(batchLabel(b))}</span>`}</span>
+      <span class="what">${o.lines.map(l => lineText(l, s) + (noteText(l) ? ` (${esc(noteText(l))})` : '')).join(', ')}</span>
+    </div>`).join('');
+  const open = list.filter(x => x.o.status !== 'sold').length;
+  return `<input class="search" id="v_q" type="search" placeholder="Name suchen …" autocomplete="off" value="${esc(ui.q)}">
+    <div class="chips">${chips}</div>
+    <div class="row" style="margin-bottom:10px"><span class="mute">${open} offene Bestellung${open === 1 ? '' : 'en'}</span><span class="sp"></span>
+      <button class="b sm" data-a="saledone">${ui.saleDone ? 'Abgeholte ausblenden' : 'Abgeholte zeigen'}</button></div>
+    <div id="v_list">${cards || '<div class="card empty">Keine offenen Bestellungen.</div>'}</div>
+    <div class="card empty" id="v_none" hidden>Niemand mit diesem Namen gefunden.</div>`;
+}
+function filterSale() {
+  const q = ui.q.trim().toLowerCase(); let n = 0;
+  document.querySelectorAll('#v_list [data-name]').forEach(el => { el.hidden = !!q && !el.dataset.name.includes(q); if (!el.hidden) n++; });
+  if ($('v_none')) $('v_none').hidden = !q || n > 0;
+}
+
+/* Ausgabe-Ansicht: übersichtlich, was die Person bekommt; optional wiegen; dann abgeben */
+function saleSheet(batchId, orderId) {
+  const b = batchOf(batchId), o = b.orders.find(x => x.id === orderId);
+  ui.modal = { type: 'order', sale: true, batchId, d: JSON.parse(JSON.stringify(o)), isNew: false };
+  drawOrder();
+}
+function drawSale() {
+  const m = ui.modal, b = batchOf(m.batchId), s = sp(b.speciesId), d = m.d;
+  const numVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
+  const lines = d.lines.map(l => {
+    const p = s.products.find(x => x.id === l.productId);
+    const kg = p && p.unit !== 'stk' ? `<input class="num" type="text" inputmode="decimal" data-f="kg" value="${numVal(l.kg)}" placeholder="kg" aria-label="Gewicht in kg">` : '';
+    return `<div class="sale-line" data-l="${l.id}">
+      <div class="sale-q">${fmt(+l.qty || 0)}×</div>
+      <div class="sale-p"><b>${esc(p ? p.name : (l.text || 'Sonderwunsch'))}</b>${noteText(l) ? `<br><span class="sale-note">${esc(noteText(l))}</span>` : ''}</div>
+      <div class="sale-in">${kg}<input class="num" type="text" inputmode="decimal" data-f="price" value="${numVal(l.price)}" placeholder="${pricePh(l, s)}" aria-label="Betrag in Euro"></div>
+    </div>`;
+  }).join('');
+  openModal(`<div class="sale-name">${esc(cust(d.customerId)?.name || '?')}</div>
+    <div class="mute">${esc(batchLabel(b))} · ${d.status === 'sold' ? 'bereits abgeholt' : 'reserviert'}</div>
+    ${d.note ? `<div class="sale-ordernote">${esc(d.note)}</div>` : ''}
+    <div style="margin-top:8px">${lines || '<div class="empty">Keine Positionen.</div>'}</div>
+    <div class="sale-total"><span>Summe</span><b id="o_sum"></b></div>
+    <div class="mute">Gewicht oder Betrag nur eintragen, wenn gewogen wurde. Sonst gilt der geschätzte Preis (≈).</div>
+    <div id="warn" hidden></div>
+    <div class="row" style="margin-top:18px"><button class="b" data-a="saleedit">Bearbeiten</button><span class="sp"></span><button class="b" data-a="close">Zurück</button>
+      <button class="b pri big" data-a="handover">✓ Abgegeben</button></div>`);
+  updateWarn();
+}
+
+function viewBestand() {
+  const batches = [...S.batches].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (!batches.find(b => b.id === ui.batchId)) ui.batchId = batches[0]?.id || null;
+  const chips = batches.map(b => `<button class="chip ${b.id === ui.batchId ? 'on' : ''}" data-a="batch" data-v="${b.id}">${esc(sp(b.speciesId).name)} · ${dateDE(b.date)}</button>`).join('');
+  let html = `<div class="chips">${chips}<button class="chip" data-a="newbatch">＋ Neuer Schlachttermin</button></div>`;
+  const b = batchOf(ui.batchId);
+  if (!b) return html + `<div class="card empty">Noch kein Schlachttermin.<br><br><button class="b pri" data-a="newbatch">Ersten Schlachttermin anlegen</button></div>`;
+
+  const s = sp(b.speciesId), c = calc(b);
+  const rows = s.products.map(p => {
+    const a = c.avail[p.id], pr = c.per[p.id];
+    const cls = a === null ? '' : a < 0 ? 'neg' : a === 0 ? 'zero' : 'ok';
+    const txt = a === null ? '–' : a;
+    return `<tr><td><b>${esc(p.name)}</b></td><td class="n"><span class="free ${cls}">${txt}</span></td><td class="n">${fmt(pr.res)}</td><td class="n">${fmt(pr.sold)}</td><td class="n mute">${p.price ? eur(p.price) + '/' + unitLabel(p) : ''}</td></tr>`;
+  }).join('');
+  const parts = s.parts.map(p => `<span class="part ${c.rem[p.id] < -1e-9 ? 'neg' : ''}">${esc(p.name)}: ${fmt(c.rem[p.id])} von ${fmt(c.total[p.id])}</span>`).join('');
+
+  html += `<div class="card">
+    <div class="row"><h2 style="margin:0">${esc(s.name)} · ${dateDE(b.date)}</h2><span class="sp"></span>
+      <button class="b sm" data-a="editbatch">Bearbeiten</button></div>
+    <div class="mute">${b.count} geschlachtet${b.note ? ' · ' + esc(b.note) : ''}</div>
+    <table style="margin-top:8px"><tr><th>Produkt</th><th class="n">Noch frei</th><th class="n">Reserviert</th><th class="n">Verkauft</th><th class="n">Preis</th></tr>${rows}</table>
+    <h3>Teile übrig (zusammen)</h3><div class="parts">${parts}</div>
+  </div>`;
+
+  const orders = [...b.orders].sort((x, y) => (x.status === 'sold') - (y.status === 'sold'));
+  html += `<div class="row" style="margin:6px 0 10px"><h2 style="margin:0">Bestellungen</h2><span class="sp"></span><button class="b pri" data-a="neworder">＋ Bestellung</button></div>`;
+  if (!orders.length) html += `<div class="card empty">Noch keine Bestellungen für diesen Termin.</div>`;
+  html += orders.map(o => {
+    const cu = cust(o.customerId);
+    const lines = o.lines.map(l => {
+      const p = s.products.find(x => x.id === l.productId);
+      const name = p ? p.name : (l.text || 'Sonderwunsch');
+      const kg = l.kg !== '' && l.kg != null ? ` <span class="mute">${fmt(+l.kg)} kg</span>` : '';
+      return `${fmt(+l.qty || 0)}× ${esc(name)}${kg}${noteText(l) ? ' <span class="mute">(' + esc(noteText(l)) + ')</span>' : ''}`;
+    }).join(', ');
+    return `<div class="card order" data-a="editorder" data-v="${o.id}">
+      <div class="top"><span class="name">${esc(cu ? cu.name : '?')}</span>
+        <span class="tag ${o.status}">${o.status === 'sold' ? 'Abgeholt' : 'Reserviert'}</span><span class="sp"></span>
+        <span class="sum">${money(orderVal(o, s))}</span></div>
+      <div class="lines">${lines || '<span class="mute">keine Positionen</span>'}</div>
+      ${o.note ? `<div class="mute">📝 ${esc(o.note)}</div>` : ''}
+      ${o.status !== 'sold' ? `<div style="margin-top:8px"><button class="b sm pri" data-a="pickup" data-v="${o.id}">✓ Abholen</button></div>` : ''}
+    </div>`;
+  }).join('');
+  return html;
+}
+
+function viewKunden() {
+  const stats = {};
+  S.batches.forEach(b => b.orders.forEach(o => {
+    const x = stats[o.customerId] ||= { n: 0, sum: 0 };
+    x.n++; if (o.status === 'sold') x.sum += orderVal(o, sp(b.speciesId)).v;
+  }));
+  const rows = [...S.customers].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(c => {
+    const x = stats[c.id] || { n: 0, sum: 0 };
+    return `<tr><td><b>${esc(c.name)}</b></td><td class="n">${x.n}</td><td class="n">${x.sum ? eur(x.sum) : ''}</td>
+      <td class="n"><button class="b sm" data-a="editcust" data-v="${c.id}">Bearbeiten</button></td></tr>`;
+  }).join('');
+  return `<div class="row" style="margin-bottom:10px"><h2 style="margin:0">Stammkunden</h2><span class="sp"></span><button class="b pri" data-a="addcust">＋ Neuer Kunde</button></div>
+  <div class="card">${S.customers.length ? `<table><tr><th>Name</th><th class="n">Bestellungen</th><th class="n">Umsatz</th><th></th></tr>${rows}</table>` : '<div class="empty">Noch keine Kunden. Neue Kunden entstehen auch automatisch, wenn du bei einer Bestellung einen neuen Namen eintippst.</div>'}</div>`;
+}
+
+function viewUmsatz() {
+  const years = [...new Set(S.batches.map(b => (b.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const bs = S.batches.filter(b => ui.year === 'all' || (b.date || '').startsWith(ui.year));
+  let sold = 0, soldEst = 0, open = 0, nOrders = 0, noPrice = 0, kgAll = 0;
+  const animals = {}, byProd = {}, byCust = {}, byMonth = {}, byBatch = [];
+  bs.forEach(b => {
+    const s = sp(b.speciesId), c = calc(b);
+    animals[s.name] = (animals[s.name] || 0) + b.count;
+    /* Auslastung = das am stärksten verplante Teil (100 % heißt: davon ist nichts mehr frei) */
+    const util = Math.max(0, ...Object.keys(c.total).map(k => c.total[k] ? c.used[k] / c.total[k] : 0));
+    let bSold = 0, bOpen = 0, bPcs = 0, bKg = 0;
+    b.orders.forEach(o => {
+      const sum = orderVal(o, s).v, done = o.status === 'sold';
+      if (done) {
+        sold += sum; bSold += sum; nOrders++;
+        const cu = cust(o.customerId)?.name || '?';
+        byCust[cu] = (byCust[cu] || 0) + sum;
+        const m = (b.date || '').slice(0, 7); byMonth[m] = (byMonth[m] || 0) + sum;
+      } else { open += sum; bOpen += sum; }
+      o.lines.forEach(l => {
+        const p = s.products.find(x => x.id === l.productId);
+        const key = p ? `${s.name} ${p.name}` : 'Sonderwünsche';
+        const x = byProd[key] ||= { res: 0, done: 0, kg: 0, kgQty: 0, sum: 0 };
+        const q = +l.qty || 0;
+        if (!done) { x.res += q; return; }
+        const lv = lineVal(l, s);
+        x.done += q; x.sum += lv.v; bPcs += q;
+        if (l.kg !== '' && l.kg != null) { x.kg += +l.kg; x.kgQty += q; bKg += +l.kg; kgAll += +l.kg; }
+        if (lv.est) soldEst += lv.v;
+        if (lv.none && p) noPrice++;
+      });
+    });
+    byBatch.push({ b, s, bSold, bOpen, bPcs, bKg, util });
+  });
+  const bars = (obj, fmtKey = k => k) => {
+    const e = Object.entries(obj).sort((a, b) => b[1] - a[1]); const max = e[0]?.[1] || 1;
+    return e.length ? `<table>${e.map(([k, v]) => `<tr><td>${esc(fmtKey(k))}</td><td style="width:40%"><div class="bar"><i style="width:${Math.max(2, v / max * 100)}%"></i></div></td><td class="n">${eur(v)}</td></tr>`).join('')}</table>` : '<div class="empty">Noch keine verkauften Bestellungen.</div>';
+  };
+  const kgTxt = n => n ? fmt(n) + ' kg' : '';
+  const prodRows = Object.entries(byProd).sort((a, b) => b[1].sum - a[1].sum || b[1].res - a[1].res).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v.res ? fmt(v.res) : ''}</td><td class="n">${v.done ? fmt(v.done) : ''}</td><td class="n">${kgTxt(v.kg)}</td><td class="n">${v.kgQty ? fmt(v.kg / v.kgQty) + ' kg' : ''}</td><td class="n">${v.sum ? eur(v.sum) : ''}</td></tr>`).join('');
+  const monthName = m => new Date(m + '-01T12:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+  const batchRows = byBatch.sort((a, b) => (b.b.date || '').localeCompare(a.b.date || '')).map(x => `<tr><td>${esc(x.s.name)} · ${dateDE(x.b.date)}</td><td class="n">${x.b.count}</td><td class="n">${Math.round(x.util * 100)} %</td><td class="n">${x.b.orders.length}</td><td class="n">${x.bPcs ? fmt(x.bPcs) : ''}</td><td class="n">${kgTxt(x.bKg)}</td><td class="n">${eur(x.bSold)}</td><td class="n mute">${x.bOpen ? eur(x.bOpen) : ''}</td></tr>`).join('');
+  const sumRow = byBatch.length > 1 ? `<tr style="font-weight:700"><td>Summe</td><td class="n">${byBatch.reduce((a, x) => a + x.b.count, 0)}</td><td></td><td class="n">${byBatch.reduce((a, x) => a + x.b.orders.length, 0)}</td><td class="n">${fmt(byBatch.reduce((a, x) => a + x.bPcs, 0))}</td><td class="n">${kgTxt(kgAll)}</td><td class="n">${eur(sold)}</td><td class="n">${open ? eur(open) : ''}</td></tr>` : '';
+  const monthsObj = Object.fromEntries(Object.entries(byMonth).sort());
+  const animalTxt = Object.entries(animals).map(([k, v]) => `${v} ${esc(k)}`).join(', ') || 'keine';
+  return `<div class="chips"><button class="chip ${ui.year === 'all' ? 'on' : ''}" data-a="year" data-v="all">Gesamt</button>${years.map(y => `<button class="chip ${ui.year === y ? 'on' : ''}" data-a="year" data-v="${y}">${y}</button>`).join('')}</div>
+  <div class="stat"><div class="card"><span class="mute">Umsatz (abgeholt)</span><b>${eur(sold)}</b>${soldEst ? `<span class="mute">davon geschätzt ${eur(soldEst)}</span>` : ''}</div>
+  <div class="card"><span class="mute">Noch offen (reserviert, geschätzt)</span><b>${eur(open)}</b></div>
+  <div class="card"><span class="mute">Schlachtungen</span><b>${bs.length}</b><span class="mute">${animalTxt}</span></div>
+  <div class="card"><span class="mute">Gewogen (abgeholt)</span><b>${kgAll ? fmt(kgAll) + ' kg' : '–'}</b><span class="mute">${nOrders} abgeholte Bestellungen</span></div></div>
+  ${noPrice ? `<div class="warn">⚠ ${noPrice} abgeholte Position(en) ohne Preis – bitte Preise unter Einstellungen eintragen (und Ø-Gewicht für die Schätzung).</div>` : ''}
+  <div class="card"><h3 style="margin-top:0">Alle Schlachtungen</h3><div class="mute">„Verplant“ zeigt das knappste Teil: so viel davon ist reserviert oder abgeholt. 100 % heißt, es ist ausverkauft.</div>${batchRows ? `<div class="scroll"><table><tr><th>Termin</th><th class="n">Tiere</th><th class="n">Verplant</th><th class="n">Bestell.</th><th class="n">Stück abgeh.</th><th class="n">Gewogen</th><th class="n">Umsatz</th><th class="n">Offen</th></tr>${batchRows}${sumRow}</table></div>` : '<div class="empty">Noch keine Termine.</div>'}</div>
+  <div class="card"><h3 style="margin-top:0">Pro Produkt</h3><div class="mute">Ø Gewicht zählt nur Stücke, die gewogen wurden.</div>${prodRows ? `<div class="scroll"><table><tr><th>Produkt</th><th class="n">Reserviert</th><th class="n">Abgeholt</th><th class="n">Gewogen</th><th class="n">Ø pro Stück</th><th class="n">Umsatz</th></tr>${prodRows}</table></div>` : '<div class="empty">Noch keine Bestellungen.</div>'}</div>
+  <div class="card"><h3 style="margin-top:0">Pro Kunde</h3>${bars(byCust)}</div>
+  <div class="card"><h3 style="margin-top:0">Pro Monat</h3>${bars(monthsObj, monthName)}</div>`;
+}
+
+function viewSettings() {
+  const speciesHtml = S.species.map(s => {
+    const partRows = s.parts.map(p => `<tr><td><input data-c="partname" data-s="${s.id}" data-p="${p.id}" value="${esc(p.name)}"></td>
+      <td style="width:120px"><input class="num" inputmode="decimal" data-c="partper" data-s="${s.id}" data-p="${p.id}" value="${fmtAmt(p.perAnimal)}"></td>
+      <td style="width:60px"><button class="b sm dan" data-a="delpart" data-s="${s.id}" data-p="${p.id}">✕</button></td></tr>`).join('');
+    const head = s.parts.map(p => `<th class="n">${esc(p.name)}</th>`).join('');
+    const prodRows = s.products.map(p => `<tr><td style="min-width:140px"><input data-c="prodname" data-s="${s.id}" data-p="${p.id}" value="${esc(p.name)}"></td>
+      <td style="width:100px"><input class="num" inputmode="decimal" placeholder="0,00" data-c="prodprice" data-s="${s.id}" data-p="${p.id}" value="${p.price ? String(p.price).replace('.', ',') : ''}"></td>
+      <td style="width:96px"><select data-c="produnit" data-s="${s.id}" data-p="${p.id}" style="padding:8px;min-height:40px"><option value="kg" ${p.unit !== 'stk' ? 'selected' : ''}>pro kg</option><option value="stk" ${p.unit === 'stk' ? 'selected' : ''}>pro Stück</option></select></td>
+      <td style="width:90px">${p.unit === 'stk' ? '' : `<input class="num" inputmode="decimal" placeholder="kg" data-c="prodavg" data-s="${s.id}" data-p="${p.id}" value="${p.avgKg ? String(p.avgKg).replace('.', ',') : ''}">`}</td>
+      ${s.parts.map(pt => `<td style="width:74px"><input class="num" inputmode="decimal" data-c="produse" data-s="${s.id}" data-p="${p.id}" data-pt="${pt.id}" value="${p.uses[pt.id] ? fmtAmt(p.uses[pt.id]) : ''}"></td>`).join('')}
+      <td style="width:60px"><button class="b sm dan" data-a="delprod" data-s="${s.id}" data-p="${p.id}">✕</button></td></tr>`).join('');
+    return `<div class="card set"><div class="row"><input style="max-width:260px;font-weight:700" data-c="spname" data-s="${s.id}" value="${esc(s.name)}"><span class="sp"></span><button class="b sm dan" data-a="delspecies" data-s="${s.id}">Tierart löschen</button></div>
+      <h3>Teile pro Tier</h3><div class="mute">Was entsteht beim Zerlegen aus einem Tier (z. B. Brust: 2).</div>
+      <table><tr><th>Teil</th><th class="n">pro Tier</th><th></th></tr>${partRows}</table>
+      <button class="b sm" data-a="addpart" data-s="${s.id}" style="margin-top:8px">＋ Teil</button>
+      <h3>Produkte zum Verkauf</h3><div class="mute">Preis pro kg oder pro Stück. <b>Ø kg/Stück</b> ist das ungefähre Gewicht eines Stücks und dient zur Preisschätzung, solange noch nicht gewogen wurde. In den Teile-Spalten steht, wie viel ein verkauftes Stück verbraucht (Bruch erlaubt, z. B. 1/6 für ein Schnitzel aus einer Brust). Leer heißt: verbraucht nichts.</div>
+      <div class="scroll"><table><tr><th>Produkt</th><th class="n">Preis €</th><th>Einheit</th><th class="n">Ø kg/Stück</th>${head}<th></th></tr>${prodRows}</table></div>
+      <button class="b sm" data-a="addprod" data-s="${s.id}" style="margin-top:8px">＋ Produkt</button></div>`;
+  }).join('');
+  return `<h2>Einstellungen</h2>
+  <div class="card set"><div class="row"><b class="sp">Aufpreis Marinade (€ pro kg)</b><input class="num" style="max-width:120px" inputmode="decimal" data-c="marinade" value="${String(+S.marinade || 0).replace('.', ',')}"></div></div>
+  ${speciesHtml}
+  <div class="row"><button class="b" data-a="addspecies">＋ Neue Tierart</button></div>
+  <h3>Datensicherung</h3>
+  <div class="card"><div class="mute" style="margin-bottom:10px">${DB ? 'Die Daten liegen in der gemeinsamen Datenbank dieses Links und sind auf allen Geräten gleich. Eine zusätzliche Sicherung schadet trotzdem nicht.' : 'Alle Daten liegen nur auf diesem Gerät. Sichere sie regelmäßig und spiele sie bei Bedarf wieder ein.'}</div>
+  <div class="row"><button class="b pri" data-a="export">Daten sichern</button><button class="b" data-a="import">Sicherung aus Datei</button><button class="b" data-a="importtext">Sicherung einfügen</button><span class="sp"></span><button class="b dan" data-a="reset">Alles löschen</button></div></div>`;
+}
+
+/* ---------- Modale Fenster ---------- */
+function openModal(html) { $('modal').innerHTML = `<div class="sheet">${html}</div>`; $('modal').classList.add('show'); }
+function closeModal() { $('modal').classList.remove('show'); $('modal').innerHTML = ''; ui.modal = null; }
+
+function batchModal(b) {
+  const isNew = !b.id;
+  ui.modal = { type: 'batch', d: { ...b } };
+  openModal(`<h2>${isNew ? 'Neuer Schlachttermin' : 'Schlachttermin bearbeiten'}</h2>
+    <label>Tierart</label><select id="m_species">${S.species.map(s => `<option value="${s.id}" ${s.id === b.speciesId ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+    <div class="grid g2"><div><label>Datum</label><input type="date" id="m_date" value="${b.date}"></div>
+    <div><label>Anzahl geschlachtet</label><input type="number" inputmode="numeric" id="m_count" value="${b.count || ''}"></div></div>
+    <label>Notiz (optional)</label><input id="m_note" value="${esc(b.note || '')}">
+    <div class="row" style="margin-top:18px">${isNew ? '' : '<button class="b dan" data-a="delbatch">Löschen</button>'}<span class="sp"></span><button class="b" data-a="close">Abbrechen</button><button class="b pri" data-a="savebatch">Speichern</button></div>`);
+}
+
+function orderModal(batch, order, pickup = false) {
+  ui.modal = { type: 'order', batchId: batch.id, d: JSON.parse(JSON.stringify(order)), isNew: !batch.orders.find(o => o.id === order.id), pickup };
+  drawOrder();
+}
+const newLine = b => ({ id: uid(), productId: sp(b.speciesId).products[0]?.id || '', qty: '', kg: '', price: '', note: '', text: '' });
+function drawOrder() {
+  if (ui.modal.sale) return drawSale();
+  const m = ui.modal, b = batchOf(m.batchId), s = sp(b.speciesId), d = m.d;
+  const numVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
+  const lines = d.lines.map(l => {
+    const p = s.products.find(x => x.id === l.productId);
+    const showKg = l.productId !== '' && p && p.unit !== 'stk';
+    return `<div class="line" data-l="${l.id}">
+    <div class="l1">
+      <select data-f="productId">${s.products.map(p => `<option value="${p.id}" ${p.id === l.productId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="" ${l.productId === '' ? 'selected' : ''}>✎ Sonderwunsch</option></select>
+      <input class="num" type="text" inputmode="decimal" data-f="qty" value="${numVal(l.qty)}" placeholder="Stück">
+      ${showKg ? `<input class="num" type="text" inputmode="decimal" data-f="kg" value="${numVal(l.kg)}" placeholder="kg">` : '<span></span>'}
+      <input class="num" type="text" inputmode="decimal" data-f="price" value="${numVal(l.price)}" placeholder="${pricePh(l, s)}">
+      <button class="b sm dan" data-a="delline" data-v="${l.id}">✕</button></div>
+    ${l.productId === '' ? `<input style="margin-top:8px" data-f="text" placeholder="Was genau? (Sonderwunsch)" value="${esc(l.text || '')}">` : ''}
+    ${l.productId !== '' ? `<label class="chk"><input type="checkbox" data-f="mar" ${l.mar ? 'checked' : ''}> mariniert (+${eur(+S.marinade || 0)}/kg)</label>` : ''}
+    <input style="margin-top:8px" data-f="note" placeholder="Notiz (z. B. einfrieren, Brüste einzeln)" value="${esc(l.note || '')}"></div>`;
+  }).join('');
+  openModal(`<h2>${m.pickup ? 'Abholung' : m.isNew ? 'Neue Bestellung' : 'Bestellung'} · ${esc(s.name)} ${dateDE(b.date)}</h2>
+    <label>Kunde</label><input id="o_cust" list="custlist" autocomplete="off" placeholder="Name wählen oder neu eintippen" value="${esc(cust(d.customerId)?.name || '')}">
+    <datalist id="custlist">${S.customers.map(c => `<option value="${esc(c.name)}">`).join('')}</datalist>
+    <label>Status</label><select id="o_status"><option value="res" ${d.status === 'res' ? 'selected' : ''}>Reserviert</option><option value="sold" ${d.status === 'sold' ? 'selected' : ''}>Abgeholt</option></select>
+    <label>Positionen</label>
+    <div class="mute" style="margin-bottom:8px">Beim Abholen <b>optional</b> das gewogene Gewicht (kg) oder direkt den Betrag (€) eintragen. Leer lassen heißt, es wird über das Ø-Gewicht geschätzt (≈).</div>
+    <div class="l1 lhead"><span>Produkt</span><span>Stück</span><span>Gewogen</span><span>Betrag</span><span></span></div>
+    ${lines || '<div class="mute">Noch keine Position.</div>'}
+    <button class="b" data-a="addline">＋ Position</button>
+    <div id="warn"></div>
+    <div class="row" style="margin:10px 0 0"><span class="sp"></span><span>Summe: <b id="o_sum"></b></span></div>
+    <label>Notiz zur Bestellung (optional)</label><input id="o_note" value="${esc(d.note || '')}">
+    <div class="row" style="margin-top:18px">${m.isNew ? '' : '<button class="b dan" data-a="delorder">Löschen</button>'}<span class="sp"></span><button class="b" data-a="close">Abbrechen</button><button class="b pri" data-a="saveorder">Speichern</button></div>`);
+  updateWarn();
+}
+function updateWarn() {
+  const m = ui.modal; if (!m || m.type !== 'order') return;
+  const b = batchOf(m.batchId), s = sp(b.speciesId);
+  const orders = b.orders.filter(o => o.id !== m.d.id).concat({ ...m.d, status: 'res' });
+  const c = calc(b, orders);
+  const bad = s.parts.filter(p => c.rem[p.id] < -1e-9).map(p => `${p.name} (${fmt(c.rem[p.id])})`);
+  $('warn').innerHTML = bad.length ? `<div class="warn">⚠ Nicht genug da: ${bad.join(', ')}</div>` : '';
+  const x = orderVal(m.d, s);
+  $('o_sum').textContent = (x.est ? '≈ ' : '') + eur(x.v);
+}
+/* Platzhalter im Betragsfeld: berechneter Betrag, wenn nichts eingetragen ist */
+function pricePh(l, s) {
+  const x = lineVal({ ...l, price: '' }, s);
+  return x.none ? '€' : (x.est ? '≈ ' : '') + eur(x.v);
+}
+
+/* ---------- Aktionen ---------- */
+function resolveCustomer(name) {
+  name = name.trim(); if (!name) return null;
+  let c = S.customers.find(x => x.name.toLowerCase() === name.toLowerCase());
+  if (!c) { c = { id: uid(), name }; S.customers.push(c); }
+  return c.id;
+}
+function download(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+const countInUse = (spId, prodId) => S.batches.filter(b => b.speciesId === spId).some(b => b.orders.some(o => o.lines.some(l => l.productId === prodId)));
+
+document.addEventListener('click', async e => {
+  const t = e.target.closest('[data-a]'); if (!t) return;
+  const a = t.dataset.a, v = t.dataset.v, sid = t.dataset.s, pid = t.dataset.p;
+  const stay = () => { save(); render(); };
+  switch (a) {
+    case 'tab': ui.tab = v; render(); window.scrollTo(0, 0); break;
+    case 'batch': ui.batchId = v; render(); break;
+    case 'year': ui.year = v; render(); break;
+    case 'close': closeModal(); break;
+    case 'newbatch': batchModal({ speciesId: S.species[0]?.id, date: today(), count: '', note: '' }); break;
+    case 'editbatch': batchModal({ ...batchOf(ui.batchId) }); break;
+    case 'savebatch': {
+      const d = ui.modal.d, count = Math.round(parseNum($('m_count').value));
+      if (!count) return await say('Bitte die Anzahl der geschlachteten Tiere eintragen.');
+      d.speciesId = $('m_species').value; d.date = $('m_date').value || today(); d.count = count; d.note = $('m_note').value.trim();
+      if (d.id) Object.assign(batchOf(d.id), { speciesId: d.speciesId, date: d.date, count: d.count, note: d.note });
+      else { d.id = uid(); d.orders = []; S.batches.push(d); ui.batchId = d.id; }
+      closeModal(); stay(); break;
+    }
+    case 'delbatch': {
+      const b = batchOf(ui.modal.d.id);
+      if (await sure(`Schlachttermin mit ${b.orders.length} Bestellung(en) wirklich löschen?`)) { S.batches = S.batches.filter(x => x !== b); closeModal(); stay(); }
+      break;
+    }
+    case 'neworder': { const b = batchOf(ui.batchId); orderModal(b, { id: uid(), t: Date.now(), customerId: null, status: 'res', note: '', lines: [newLine(b)] }); break; }
+    case 'migrate': { const x = localLeftovers(); if (x) mergeLocal(x.L); render(); break; }
+    case 'droplocal':
+      if (await sure('Die alten Daten auf diesem Gerät nicht übernehmen? Sie bleiben im Browser liegen, werden aber nicht mehr angezeigt.')) { try { localStorage.setItem(KEY + '-moved', '1'); } catch (e) {} render(); }
+      break;
+    case 'editorder': { const b = batchOf(ui.batchId); orderModal(b, b.orders.find(o => o.id === v)); break; }
+    case 'pickup': saleSheet(ui.batchId, v); break;
+    case 'sale': { const [bid, oid] = v.split(':'); saleSheet(bid, oid); break; }
+    case 'salebatch': ui.saleBatch = v; render(); break;
+    case 'saledone': ui.saleDone = !ui.saleDone; render(); break;
+    case 'saleedit': ui.modal.sale = false; ui.modal.pickup = true; ui.modal.d.status = 'sold'; drawOrder(); break;
+    case 'handover': {
+      const d = ui.modal.d, b = batchOf(ui.modal.batchId);
+      d.status = 'sold';
+      b.orders[b.orders.findIndex(o => o.id === d.id)] = d;
+      ui.q = '';
+      closeModal(); stay(); break;
+    }
+    case 'addline': { const b = batchOf(ui.modal.batchId); syncOrderHead(); ui.modal.d.lines.push(newLine(b)); drawOrder(); break; }
+    case 'delline': syncOrderHead(); ui.modal.d.lines = ui.modal.d.lines.filter(l => l.id !== v); drawOrder(); break;
+    case 'saveorder': {
+      syncOrderHead();
+      const d = ui.modal.d, b = batchOf(ui.modal.batchId), name = $('o_cust').value;
+      if (!name.trim()) return await say('Bitte einen Kunden eintragen.');
+      d.customerId = resolveCustomer(name);
+      d.lines = d.lines.filter(l => (+l.qty || 0) > 0 || (l.productId === '' && l.text));
+      const i = b.orders.findIndex(o => o.id === d.id);
+      if (i >= 0) b.orders[i] = d; else b.orders.push(d);
+      closeModal(); stay(); break;
+    }
+    case 'delorder': {
+      if (await sure('Bestellung wirklich löschen?')) { const b = batchOf(ui.modal.batchId); b.orders = b.orders.filter(o => o.id !== ui.modal.d.id); closeModal(); stay(); }
+      break;
+    }
+    case 'addcust': { const n = await ask('Name des neuen Kunden:'); if (n && n.trim()) { resolveCustomer(n); stay(); } break; }
+    case 'editcust': {
+      const c = cust(v), n = await ask('Name ändern (leer lassen zum Löschen):', c.name);
+      if (n === null) break;
+      if (!n.trim()) {
+        if (S.batches.some(b => b.orders.some(o => o.customerId === c.id))) await say('Dieser Kunde hat Bestellungen und kann nicht gelöscht werden.');
+        else S.customers = S.customers.filter(x => x !== c);
+      } else c.name = n.trim();
+      stay(); break;
+    }
+    /* Einstellungen */
+    case 'addspecies': { const n = await ask('Name der Tierart (z. B. Ente):'); if (n && n.trim()) { S.species.push({ id: uid(), name: n.trim(), parts: [], products: [] }); stay(); } break; }
+    case 'delspecies': {
+      if (S.batches.some(b => b.speciesId === sid)) return await say('Zu dieser Tierart gibt es Schlachttermine. Erst diese löschen.');
+      if (await sure('Tierart wirklich löschen?')) { S.species = S.species.filter(s => s.id !== sid); stay(); }
+      break;
+    }
+    case 'addpart': { const n = await ask('Name des Teils (z. B. Rücken):'); if (n && n.trim()) { sp(sid).parts.push({ id: uid(), name: n.trim(), perAnimal: 1 }); stay(); } break; }
+    case 'delpart': {
+      if (!await sure('Teil wirklich löschen?')) break;
+      const s = sp(sid); s.parts = s.parts.filter(p => p.id !== pid); s.products.forEach(p => delete p.uses[pid]); stay(); break;
+    }
+    case 'addprod': { const n = await ask('Name des Produkts (z. B. Rücken):'); if (n && n.trim()) { sp(sid).products.push({ id: uid(), name: n.trim(), uses: {}, price: 0, unit: 'kg', avgKg: 0 }); stay(); } break; }
+    case 'delprod': {
+      if (countInUse(sid, pid)) return await say('Dieses Produkt wird in Bestellungen verwendet und kann nicht gelöscht werden.');
+      if (await sure('Produkt wirklich löschen?')) { const s = sp(sid); s.products = s.products.filter(p => p.id !== pid); stay(); }
+      break;
+    }
+    case 'export': {
+      const json = JSON.stringify(S);
+      let copied = false;
+      try { await navigator.clipboard.writeText(json); copied = true; } catch (err) {}
+      download(`gefluegel-sicherung-${today()}.json`, json);
+      await say(copied
+        ? 'Die Sicherung wurde in die Zwischenablage kopiert. Füge sie z. B. in eine Notiz oder Mail an dich selbst ein. Falls ein Download startet, liegt sie zusätzlich als Datei vor.'
+        : 'Falls kein Download gestartet ist: Kopieren war hier nicht erlaubt. Bitte die App über Safari „Zum Home-Bildschirm“ öffnen und dort sichern.');
+      break;
+    }
+    case 'import': $('importFile').click(); break;
+    case 'importtext': {
+      const txt = await ask('Gesicherten Text hier einfügen:');
+      if (txt) await importJSON(txt);
+      break;
+    }
+    case 'reset':
+      if (await sure('Wirklich ALLE Daten löschen?') && await sure('Sicher? Das kann nicht rückgängig gemacht werden.')) { S = seed(); ui.batchId = null; stay(); }
+      break;
+  }
+});
+
+/* Kopfdaten des offenen Bestell-Fensters in den Entwurf übernehmen, bevor neu gezeichnet wird */
+function syncOrderHead() {
+  const d = ui.modal.d;
+  d.status = $('o_status').value; d.note = $('o_note').value;
+  d._name = $('o_cust').value;
+}
+
+/* Eingaben in Bestell-Fenster */
+$('modal').addEventListener('input', e => {
+  const t = e.target, row = t.closest('[data-l]');
+  if (!row || !t.dataset.f || !ui.modal || ui.modal.type !== 'order') return;
+  const l = ui.modal.d.lines.find(x => x.id === row.dataset.l), s = sp(batchOf(ui.modal.batchId).speciesId);
+  if (['qty', 'kg', 'price'].includes(t.dataset.f)) {
+    l[t.dataset.f] = t.value.trim() === '' ? '' : parseNum(t.value);
+    row.querySelector('[data-f=price]').placeholder = pricePh(l, s);
+  } else if (t.type === 'checkbox') {
+    l[t.dataset.f] = t.checked;
+    row.querySelector('[data-f=price]').placeholder = pricePh(l, s);
+  } else l[t.dataset.f] = t.value;
+  updateWarn();
+});
+$('modal').addEventListener('change', e => {
+  const t = e.target, row = t.closest('[data-l]');
+  if (t.id === 'o_status') ui.modal.d.status = t.value;
+  if (!row || t.dataset.f !== 'productId') return;
+  syncOrderHead();
+  const l = ui.modal.d.lines.find(x => x.id === row.dataset.l);
+  l.productId = t.value; drawOrder();
+});
+/* Beim Neuzeichnen den getippten Kundennamen behalten */
+const _drawOrder = drawOrder;
+drawOrder = function () {
+  const name = ui.modal.d._name;
+  _drawOrder();
+  if (name !== undefined && $('o_cust')) $('o_cust').value = name;
+};
+
+/* Verkauf: Suche filtert die Liste, ohne neu zu zeichnen (Tastatur bleibt offen) */
+$('app').addEventListener('input', e => { if (e.target.id === 'v_q') { ui.q = e.target.value; filterSale(); } });
+
+/* Einstellungen: Änderungen speichern */
+$('app').addEventListener('change', e => {
+  const t = e.target, c = t.dataset.c; if (!c) return;
+  const s = sp(t.dataset.s), p = s?.products.find(x => x.id === t.dataset.p), pt = s?.parts.find(x => x.id === t.dataset.p);
+  if (c === 'marinade') S.marinade = parseNum(t.value);
+  if (c === 'spname') s.name = t.value.trim() || s.name;
+  if (c === 'partname') pt.name = t.value.trim() || pt.name;
+  if (c === 'partper') pt.perAnimal = parseAmt(t.value);
+  if (c === 'prodname') p.name = t.value.trim() || p.name;
+  if (c === 'prodprice') p.price = parseNum(t.value);
+  if (c === 'produnit') p.unit = t.value;
+  if (c === 'prodavg') p.avgKg = parseNum(t.value);
+  if (c === 'produse') { const v = parseAmt(t.value); if (v > 0) p.uses[t.dataset.pt] = v; else delete p.uses[t.dataset.pt]; }
+  save(); render();
+});
+
+$('importFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = async () => { e.target.value = ''; await importJSON(r.result); };
+  r.readAsText(f);
+});
+async function importJSON(text) {
+  let j;
+  try { j = JSON.parse(text); if (!j.species || !j.batches || !j.customers) throw 0; }
+  catch (err) { return say('Das ist keine gültige Sicherung.'); }
+  if (await sure('Bestehende Daten auf diesem Gerät durch die Sicherung ersetzen?')) { S = normalize(j); ui.batchId = null; save(); render(); }
+}
+
+$('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+$('app').addEventListener('focusout', () => { if (pendingRender) setTimeout(() => { if (pendingRender) scheduleRender(); }, 0); });
+
+render();
+initSync();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
