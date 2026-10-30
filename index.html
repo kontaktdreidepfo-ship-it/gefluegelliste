@@ -205,6 +205,18 @@ label{display:block;font-size:13px;color:var(--mute);font-weight:700;letter-spac
 .sale-note{display:inline-block;margin-top:5px;background:var(--yolkbg);color:var(--yolkink);border-radius:8px;padding:2px 9px;font-weight:600;font-size:14px}
 .sale-in{display:flex;gap:6px}
 .sale-in input{width:96px}
+.sale-done{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right}
+.sale-done span{font-size:14px;color:var(--mute);font-variant-numeric:tabular-nums}
+.sale-done b{font:700 22px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.w-progress{display:flex;align-items:center;gap:12px;margin:10px 0 14px;font-size:14px;color:var(--mute);font-weight:600}
+.w-progress .meter{flex:1;margin:0;height:8px}
+.w-order.done{border-color:var(--green)}
+.w-order .w-sum{font:700 22px/1 var(--f-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.w-line{display:grid;grid-template-columns:minmax(0,1fr) 110px 92px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.w-line:last-child{border-bottom:0;padding-bottom:0}
+.w-line input{font-size:19px}
+.w-price{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.w-price.est{color:var(--mute);font-weight:500}
 .ticket{border:2px dashed var(--fieldline);border-radius:16px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;background:var(--card)}
 .ticket span{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
 .ticket b{font:700 42px/1 var(--f-display);font-variant-numeric:tabular-nums}
@@ -238,6 +250,7 @@ label{display:block;font-size:13px;color:var(--mute);font-weight:700;letter-spac
   .sale-line{grid-template-columns:48px minmax(0,1fr)}.sale-in{grid-column:2/-1;min-width:0}.sale-in input{flex:1;width:auto;min-width:0}
   .l1{grid-template-columns:1fr 1fr 1.3fr 46px}.l1 select{grid-column:1/-1}.lhead{display:none}
   .tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .w-line{grid-template-columns:minmax(0,1fr) 96px}.w-line .w-what{grid-column:1/-1}.w-line input{grid-column:1}.w-price{grid-column:2}
   .sheet .big{flex-basis:100%;order:-1}
 }
 </style>
@@ -559,6 +572,19 @@ const r2 = n => Math.round(n * 100) / 100;
 /* Produkt einer Position – bei Tiefkühler-Ware (tk = Tierart) aus deren Produktliste */
 const lineSp = (l, s) => l.tk ? sp(l.tk) || s : s;
 const prodOf = (l, s) => lineSp(l, s).products.find(x => x.id === l.productId);
+/* Muss diese Position noch gewogen werden? (kg-Ware ohne Gewicht und ohne festen Betrag) */
+function needsKg(l, s) {
+  const p = prodOf(l, s);
+  return !!p && p.unit !== 'stk' && (l.price === '' || l.price == null) && (l.kg === '' || l.kg == null);
+}
+const kgLine = (l, s) => { const p = prodOf(l, s); return !!p && p.unit !== 'stk'; };
+/* Gewicht eingeben: "1,6" oder einzelne Pakete "0,41+0,39+0,44" */
+function parseKg(v) {
+  const parts = String(v).split('+').map(x => x.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  return Math.round(parts.reduce((a, x) => a + parseNum(x), 0) * 1000) / 1000;
+}
+const kgVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
 function lineName(l, s) {
   const p = prodOf(l, s);
   if (!p) return l.text || 'Sonderwunsch';
@@ -656,7 +682,7 @@ function viewVerkauf() {
       ${avatar(name)}
       <span class="name">${esc(name)}</span>
       <span class="right">${o.status === 'sold' ? '<span class="tag sold">Abgeholt</span>' : `<span class="sum">${money(orderVal(o, s))}</span>`}</span>
-      <span class="meta">${esc(batchLabel(b))}</span>
+      <span class="meta">${esc(batchLabel(b))}${o.lines.some(l => kgLine(l, s)) ? (o.lines.some(l => needsKg(l, s)) ? " · noch nicht gewogen" : " · gewogen ✓") : ""}</span>
       <div class="items">${itemChips(o, s)}</div>
     </div>`).join('');
   const open = list.filter(x => x.o.status !== 'sold').length;
@@ -682,13 +708,17 @@ function saleSheet(batchId, orderId) {
 function drawSale() {
   const m = ui.modal, b = batchOf(m.batchId), s = sp(b.speciesId), d = m.d;
   const numVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
+  const open = d.lines.some(l => needsKg(l, s));
   const lines = d.lines.map(l => {
     const p = prodOf(l, s);
+    const edit = m.editAll || needsKg(l, s);
     const kg = p && p.unit !== 'stk' ? `<input class="num" type="text" inputmode="decimal" data-f="kg" value="${numVal(l.kg)}" placeholder="kg" aria-label="Gewicht in kg">` : '';
+    const lv = lineVal(l, s);
+    const done = `<div class="sale-done">${l.kg !== '' && l.kg != null ? `<span>${fmt(+l.kg)} kg</span>` : ''}<b>${lv.none ? '–' : (lv.est ? '≈ ' : '') + eur(lv.v)}</b></div>`;
     return `<div class="sale-line" data-l="${l.id}">
       <div class="sale-q">${fmt(+l.qty || 0)}×</div>
       <div class="sale-p"><b>${esc(lineName(l, s))}</b>${noteText(l) ? `<br><span class="sale-note">${esc(noteText(l))}</span>` : ''}</div>
-      <div class="sale-in">${kg}<input class="num" type="text" inputmode="decimal" data-f="price" value="${numVal(l.price)}" placeholder="${pricePh(l, s)}" aria-label="Betrag in Euro"></div>
+      ${edit ? `<div class="sale-in">${kg}<input class="num" type="text" inputmode="decimal" data-f="price" value="${numVal(l.price)}" placeholder="${pricePh(l, s)}" aria-label="Betrag in Euro"></div>` : done}
     </div>`;
   }).join('');
   const name = cust(d.customerId)?.name || '?';
@@ -696,8 +726,9 @@ function drawSale() {
     <div class="mute">${esc(batchLabel(b))} · ${d.status === 'sold' ? 'bereits abgeholt' : 'reserviert'}</div></div></div>
     ${d.note ? `<div class="sale-ordernote">${esc(d.note)}</div>` : ''}
     <div class="card" style="margin:14px 0 0;padding-block:4px">${lines || '<div class="empty">Keine Positionen.</div>'}</div>
-    <div class="ticket"><span>Summe</span><b id="o_sum"></b></div>
-    <div class="mute">Gewicht oder Betrag nur eintragen, wenn gewogen wurde. Sonst gilt der geschätzte Preis (≈).</div>
+    <div class="ticket"><span>${open ? 'Summe (teils geschätzt)' : 'Zu zahlen'}</span><b id="o_sum"></b></div>
+    <div class="mute">${open ? 'Noch nicht alles gewogen: Gewicht oben eintragen, sonst gilt der geschätzte Preis (≈).' : 'Alles gewogen – der Preis steht fest.'}
+      ${!open && !m.editAll ? ' <button class="b sm" data-a="saleeditkg" style="margin-left:6px">Gewicht ändern</button>' : ''}</div>
     <div id="warn" hidden></div>
     <div class="row" style="margin-top:18px"><button class="b" data-a="saleedit">Bearbeiten</button><span class="sp"></span><button class="b" data-a="close">Zurück</button>
       <button class="b pri big" data-a="handover">✓ Abgegeben</button></div>`);
@@ -719,6 +750,8 @@ function viewBestand() {
   let nRes = 0, nSold = 0;
   b.orders.forEach(o => o.status === 'sold' ? nSold++ : nRes++);
   const nFrozen = Object.values(b.frozen || {}).reduce((a, v) => a + (+v || 0), 0);
+  let kgTotal = 0, kgOpen = 0;
+  b.orders.forEach(o => o.lines.forEach(l => { if (kgLine(l, s)) { kgTotal++; if (needsKg(l, s)) kgOpen++; } }));
   const tiles = s.products.map(p => {
     const a = c.avail[p.id], pr = c.per[p.id];
     const cls = a === null ? 'na' : a < 0 ? 'neg' : a === 0 ? 'zero' : 'ok';
@@ -738,7 +771,7 @@ function viewBestand() {
       <button class="b sm" data-a="editbatch">Bearbeiten</button>
       <div class="facts"><div><b>${b.count}</b><span>geschlachtet</span></div><div><b>${nRes}</b><span>reserviert</span></div><div><b>${nSold}</b><span>abgeholt</span></div>${nFrozen ? `<div><b>${fmt(nFrozen)}</b><span>eingefroren</span></div>` : ''}</div>
       ${b.note ? `<div class="mute" style="grid-column:1/-1">${esc(b.note)}</div>` : ''}
-      <div style="grid-column:1/-1;margin-top:6px"><button class="b sm" data-a="freeze">❄ ${nFrozen ? 'Eingefrorenes ändern' : 'Rest einfrieren'}</button></div>
+      <div class="row" style="grid-column:1/-1;margin-top:6px">${kgTotal ? `<button class="b sm ${kgOpen ? 'pri' : ''}" data-a="weigh">⚖ Gewichte eintragen · ${kgTotal - kgOpen}/${kgTotal}</button>` : ''}<button class="b sm" data-a="freeze">❄ ${nFrozen ? 'Eingefrorenes ändern' : 'Rest einfrieren'}</button></div>
     </div>
     <div class="tiles">${tiles}</div>
     <h3>Teile übrig</h3><div class="parts">${parts}</div>`;
@@ -783,6 +816,48 @@ function viewFreezer() {
   }).join('');
   return intro + groups + (log ? `<h3>Eigenverbrauch</h3><div class="card scroll"><table><tr><th>Datum</th><th>Ware</th><th class="n">Stück</th><th></th></tr>${log}</table></div>` : '');
 }
+/* Nach dem Verpacken: alle Bestellungen eines Termins untereinander, Gewicht je Position eintragen.
+   Gespeichert wird beim Verlassen eines Feldes; Preise und Summen rechnen sofort mit. */
+function weighModal(batchId) {
+  const b = batchOf(batchId), s = sp(b.speciesId);
+  ui.modal = { type: 'weigh', batchId };
+  const orders = [...b.orders].filter(o => o.lines.some(l => kgLine(l, s)))
+    .sort((x, y) => (x.status === 'sold') - (y.status === 'sold') || (cust(x.customerId)?.name || '').localeCompare(cust(y.customerId)?.name || '', 'de'));
+  const cards = orders.map(o => {
+    const name = cust(o.customerId)?.name || '?';
+    const rows = o.lines.map(l => `<div class="w-line">
+        <div class="w-what"><b>${fmt(+l.qty || 0)}×</b> ${esc(lineName(l, s))}${noteText(l) ? ` <span class="sale-note">${esc(noteText(l))}</span>` : ''}</div>
+        ${kgLine(l, s) ? `<input class="num" type="text" inputmode="decimal" data-wl="${o.id}|${l.id}" value="${kgVal(l.kg)}" placeholder="kg" aria-label="${esc(name)}: ${esc(lineName(l, s))} in kg">` : '<span></span>'}
+        <span class="w-price" id="wp_${l.id}"></span>
+      </div>`).join('');
+    return `<div class="card w-order" id="wo_${o.id}"><div class="row" style="gap:12px;flex-wrap:nowrap">${avatar(name)}<b class="sp" style="font-size:19px">${esc(name)}</b>
+      ${o.status === 'sold' ? '<span class="tag sold">Abgeholt</span>' : ''}<span class="w-sum" id="ws_${o.id}"></span></div>${rows}</div>`;
+  }).join('');
+  openModal(`<div class="eyebrow">${esc(batchLabel(b))}</div><h2>⚖ Gewichte eintragen</h2>
+    <div class="mute" style="margin:6px 0 4px">Gewicht der verpackten Ware je Position in kg. Mehrere Pakete mit „+“: <b>0,41+0,39+0,44</b>. Wird automatisch gespeichert.</div>
+    <div class="w-progress" id="w_prog"></div>
+    ${cards || emptyBox('basket', 'Keine Bestellungen mit Ware nach Gewicht.')}
+    <div class="row" style="margin-top:14px"><span class="sp"></span><button class="b pri big" data-a="close">Fertig</button></div>`);
+  updateWeigh();
+}
+function updateWeigh() {
+  const m = ui.modal; if (!m || m.type !== 'weigh') return;
+  const b = batchOf(m.batchId), s = sp(b.speciesId);
+  let total = 0, open = 0;
+  b.orders.forEach(o => {
+    o.lines.forEach(l => {
+      if (kgLine(l, s)) { total++; if (needsKg(l, s)) open++; }
+      const el = $('wp_' + l.id); if (!el) return;
+      const lv = lineVal(l, s);
+      el.textContent = lv.none ? '' : (lv.est ? '≈ ' : '') + eur(lv.v);
+      el.classList.toggle('est', lv.est);
+    });
+    const ws = $('ws_' + o.id); if (ws) ws.textContent = money(orderVal(o, s));
+    const card = $('wo_' + o.id); if (card) card.classList.toggle('done', !o.lines.some(l => needsKg(l, s)));
+  });
+  $('w_prog').innerHTML = `<div class="meter"><i style="width:${total ? Math.round((total - open) / total * 100) : 100}%"></i></div><span>${total - open} von ${total} Positionen gewogen</span>`;
+}
+
 function freezeModal(b) {
   const s = sp(b.speciesId), c = calc(b, b.orders, {});
   const rows = s.products.filter(p => c.avail[p.id] !== null).map(p => {
@@ -986,7 +1061,11 @@ function viewSettings() {
 
 /* ---------- Modale Fenster ---------- */
 function openModal(html) { $('modal').innerHTML = `<div class="sheet">${html}</div>`; $('modal').classList.add('show'); }
-function closeModal() { $('modal').classList.remove('show'); $('modal').innerHTML = ''; ui.modal = null; }
+function closeModal() {
+  const weighed = ui.modal?.type === 'weigh';
+  $('modal').classList.remove('show'); $('modal').innerHTML = ''; ui.modal = null;
+  if (weighed) { save(); render(); }
+}
 
 function batchModal(b) {
   const isNew = !b.id;
@@ -1126,6 +1205,8 @@ document.addEventListener('click', async e => {
     case 'salebatch': ui.saleBatch = v; render(); break;
     case 'saledone': ui.saleDone = !ui.saleDone; render(); break;
     case 'saleedit': ui.modal.sale = false; ui.modal.pickup = true; ui.modal.d.status = 'sold'; drawOrder(); break;
+    case 'saleeditkg': ui.modal.editAll = true; drawOrder(); break;
+    case 'weigh': weighModal(ui.batchId); break;
     case 'handover': {
       const d = ui.modal.d, b = batchOf(ui.modal.batchId);
       d.status = 'sold';
@@ -1208,11 +1289,17 @@ function syncOrderHead() {
 
 /* Eingaben in Bestell-Fenster */
 $('modal').addEventListener('input', e => {
+  const wl = e.target.dataset?.wl;
+  if (wl && ui.modal?.type === 'weigh') {
+    const [oid, lid] = wl.split('|'), o = batchOf(ui.modal.batchId).orders.find(x => x.id === oid), l = o?.lines.find(x => x.id === lid);
+    if (l) { l.kg = parseKg(e.target.value); updateWeigh(); }
+    return;
+  }
   const t = e.target, row = t.closest('[data-l]');
   if (!row || !t.dataset.f || !ui.modal || ui.modal.type !== 'order') return;
   const l = ui.modal.d.lines.find(x => x.id === row.dataset.l), s = sp(batchOf(ui.modal.batchId).speciesId);
   if (['qty', 'kg', 'price'].includes(t.dataset.f)) {
-    l[t.dataset.f] = t.value.trim() === '' ? '' : parseNum(t.value);
+    l[t.dataset.f] = t.dataset.f === 'kg' ? parseKg(t.value) : t.value.trim() === '' ? '' : parseNum(t.value);
     row.querySelector('[data-f=price]').placeholder = pricePh(l, s);
   } else if (t.type === 'checkbox') {
     l[t.dataset.f] = t.checked;
@@ -1221,6 +1308,7 @@ $('modal').addEventListener('input', e => {
   updateWarn();
 });
 $('modal').addEventListener('change', e => {
+  if (e.target.dataset?.wl) { save(); return; }
   const t = e.target, row = t.closest('[data-l]');
   if (t.id === 'o_status') ui.modal.d.status = t.value;
   if (!row || t.dataset.f !== 'productId') return;
