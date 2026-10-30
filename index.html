@@ -99,6 +99,10 @@ h3{font:700 20px/1.1 var(--f-display);margin:22px 0 10px;letter-spacing:.01em}
 .b.sm{padding:6px 13px;min-height:38px;font-size:15px}
 a.b{display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none}
 .b.wa svg{width:20px;height:20px;color:#25a244}
+.bc-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.bc-row:last-child{border-bottom:0}
+.b.wa.sent{background:var(--greenbg);border-color:var(--greenbg);color:var(--green-ink)}
+textarea{font:17px/1.45 var(--f-body);resize:vertical;min-height:200px}
 .rv{background:var(--green);color:var(--ongreen);border-radius:22px;padding:22px 20px;margin-top:6px}
 .rv .eyebrow{color:var(--ongreen);opacity:.75}
 .rv h2{font-size:40px;color:var(--ongreen)}
@@ -820,7 +824,7 @@ function viewBestand() {
       <button class="b sm" data-a="editbatch">Bearbeiten</button>
       <div class="facts"><div><b>${b.count}</b><span>geschlachtet</span></div><div><b>${nRes}</b><span>reserviert</span></div><div><b>${nSold}</b><span>abgeholt</span></div>${nFrozen ? `<div><b>${fmt(nFrozen)}</b><span>eingefroren</span></div>` : ''}</div>
       ${b.note ? `<div class="mute" style="grid-column:1/-1">${esc(b.note)}</div>` : ''}
-      <div class="row" style="grid-column:1/-1;margin-top:6px">${kgTotal ? `<button class="b sm ${kgOpen ? 'pri' : ''}" data-a="weigh">⚖ Gewichte eintragen · ${kgTotal - kgOpen}/${kgTotal}</button>` : ''}<button class="b sm" data-a="freeze">❄ ${nFrozen ? 'Eingefrorenes ändern' : 'Rest einfrieren'}</button></div>
+      <div class="row" style="grid-column:1/-1;margin-top:6px">${kgTotal ? `<button class="b sm ${kgOpen ? 'pri' : ''}" data-a="weigh">⚖ Gewichte eintragen · ${kgTotal - kgOpen}/${kgTotal}</button>` : ''}<button class="b sm" data-a="freeze">❄ ${nFrozen ? 'Eingefrorenes ändern' : 'Rest einfrieren'}</button><button class="b sm" data-a="announce">📣 Ankündigen${Object.keys(b.announced || {}).length ? ' · ' + Object.keys(b.announced).length + ' ✓' : ''}</button></div>
     </div>
     <div class="tiles">${tiles}</div>
     <h3>Teile übrig</h3><div class="parts">${parts}</div>`;
@@ -956,6 +960,55 @@ function reviewModal(year) {
     <div class="rv"><div class="eyebrow">Geflügelliste</div><h2>Unser Jahr ${esc(year)}</h2>
       ${bs.length ? `<div class="rv-grid">${tiles}</div><ul class="rv-facts">${facts}</ul>` : '<p>Für dieses Jahr gibt es noch keine Schlachtungen.</p>'}</div>
     <div class="row" style="margin-top:14px"><span class="sp"></span><button class="b" data-a="close">Schließen</button></div>`);
+}
+
+/* Ankündigung der nächsten Schlachtung per WhatsApp: an alle teilen (Broadcast-Liste/Gruppe/Status)
+   oder pro Kunde persönlich, mit Häkchen wer schon benachrichtigt ist */
+function announceTemplate(b, until = '') {
+  const s = sp(b.speciesId);
+  const day = b.date ? new Date(b.date + 'T12:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) : 'bald';
+  const plural = { 'Hähnchen': 'Hähnchen', 'Pute': 'Puten', 'Gans': 'Gänse' }[s.name] || s.name;
+  const prices = s.products.filter(p => p.price).map(p => `• ${p.name}: ${eur(p.price)}${p.unit === 'stk' ? ' pro Stück' : '/kg'}`).join('\n');
+  const untilTxt = until ? new Date(until + 'T12:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+  return `Hallo {Name},\nam ${day} schlachten wir wieder ${plural}. 🐔\n\n${prices ? 'Unsere Preise:\n' + prices + (S.marinade ? `\nMariniert +${eur(+S.marinade)}/kg` : '') + '\n\n' : ''}Wer etwas möchte, schreibt uns bitte ${untilTxt ? 'bis ' + untilTxt + ' ' : ''}hier zurück, was und wie viel.\n\nViele Grüße`;
+}
+const firstName = n => (n || '').trim().split(/\s+/)[0];
+const announceText = (b, name) => (b.announceText || announceTemplate(b)).replaceAll('{Name}', name);
+function announceCount(b) {
+  const withPhone = S.customers.filter(c => c.phone).length, sent = Object.keys(b.announced || {}).filter(id => cust(id)).length;
+  return `${sent} von ${withPhone} benachrichtigt`;
+}
+function announceModal(batchId) {
+  const b = batchOf(batchId);
+  ui.modal = { type: 'announce', batchId };
+  const list = [...S.customers].sort((a, c) => a.name.localeCompare(c.name, 'de'));
+  const rows = list.map(c => {
+    const sent = (b.announced || {})[c.id];
+    return `<div class="bc-row">${avatar(c.name)}<div class="sp" style="min-width:0"><b>${esc(c.name)}</b>${c.phone ? '' : '<div class="mute">keine Handynummer – unter Kunden eintragen</div>'}</div>
+      ${c.phone ? `<a class="b sm wa ${sent ? 'sent' : ''}" data-a="wasend" data-v="${c.id}" data-bc="${c.id}" href="#" target="_blank" rel="noopener">${WA_ICON}<span>${sent ? '✓ Gesendet' : 'Senden'}</span></a>` : ''}</div>`;
+  }).join('');
+  openModal(`<div class="eyebrow">${esc(batchLabel(b))}</div><h2>📣 Schlachtung ankündigen</h2>
+    <label for="bc_text">Nachricht <span style="font-weight:500;letter-spacing:0">– {Name} wird durch den Vornamen ersetzt</span></label>
+    <textarea id="bc_text" rows="11">${esc(b.announceText || announceTemplate(b))}</textarea>
+    <div class="row" style="margin-top:8px"><label for="bc_until" style="margin:0">Bestellungen bis</label><input id="bc_until" type="date" style="width:auto;flex:1;min-width:150px">
+      <button class="b sm" data-a="bctemplate">Vorlage neu erstellen</button></div>
+    <h3>An alle auf einmal</h3>
+    <div class="mute" style="margin-bottom:8px">Öffnet WhatsApp mit der Nachricht („Hallo zusammen“). Dort eine Broadcast-Liste, eine Gruppe oder deinen Status auswählen.</div>
+    <a class="b wa" id="bc_all" data-a="wa" href="#" target="_blank" rel="noopener">${WA_ICON}An alle teilen</a>
+    <h3>Persönlich an Stammkunden</h3>
+    <div class="row" style="margin-bottom:6px"><span class="mute" id="bc_count">${announceCount(b)}</span><span class="sp"></span>${Object.keys(b.announced || {}).length ? '<button class="b sm" data-a="bcreset">Häkchen zurücksetzen</button>' : ''}</div>
+    <div class="card" style="padding-block:4px">${rows || '<div class="empty">Noch keine Stammkunden.</div>'}</div>
+    <div class="row" style="margin-top:14px"><span class="sp"></span><button class="b pri" data-a="close">Fertig</button></div>`);
+  refreshAnnounceLinks();
+}
+/* Links bei jeder Textänderung neu bauen */
+function refreshAnnounceLinks() {
+  const b = batchOf(ui.modal.batchId);
+  $('bc_all').href = `https://wa.me/?text=${encodeURIComponent(announceText(b, 'zusammen'))}`;
+  document.querySelectorAll('#modal [data-bc]').forEach(a => {
+    const c = cust(a.dataset.bc);
+    a.href = `https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(announceText(b, firstName(c.name)))}`;
+  });
 }
 
 function freezeModal(b) {
@@ -1395,6 +1448,26 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'wa': break;   // Link öffnet WhatsApp selbst
+    case 'announce': announceModal(ui.batchId); break;
+    case 'wasend': {
+      /* Link öffnet WhatsApp; hier nur als benachrichtigt merken */
+      const b = batchOf(ui.modal.batchId);
+      b.announced = { ...(b.announced || {}), [v]: Date.now() };
+      save();
+      t.classList.add('sent'); t.querySelector('span').textContent = '✓ Gesendet';
+      $('bc_count').textContent = announceCount(b);
+      break;
+    }
+    case 'bcreset': {
+      const b = batchOf(ui.modal.batchId);
+      if (await sure('Alle Häkchen „gesendet“ für diesen Termin zurücksetzen?')) { b.announced = {}; save(); announceModal(b.id); }
+      break;
+    }
+    case 'bctemplate': {
+      const b = batchOf(ui.modal.batchId);
+      b.announceText = announceTemplate(b, $('bc_until').value); save(); announceModal(b.id);
+      break;
+    }
     case 'review': reviewModal(v); break;
     /* Einstellungen */
     case 'addspecies': { const n = await ask('Name der Tierart (z. B. Ente):'); if (n && n.trim()) { S.species.push({ id: uid(), name: n.trim(), parts: [], products: [] }); stay(); } break; }
@@ -1463,7 +1536,11 @@ $('modal').addEventListener('input', e => {
   } else l[t.dataset.f] = t.value;
   updateWarn();
 });
+$('modal').addEventListener('input', e => {
+  if (e.target.id === 'bc_text' && ui.modal?.type === 'announce') { batchOf(ui.modal.batchId).announceText = e.target.value; refreshAnnounceLinks(); }
+});
 $('modal').addEventListener('change', e => {
+  if (e.target.id === 'bc_text') { save(); return; }
   if (e.target.dataset?.wl) { save(); return; }
   if (ui.modal?.sale && ['kg', 'price'].includes(e.target.dataset?.f)) { persistSale(); return; }
   const t = e.target, row = t.closest('[data-l]');
