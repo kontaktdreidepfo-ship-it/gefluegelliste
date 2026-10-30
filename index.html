@@ -215,6 +215,21 @@ label{display:block;font-size:13px;color:var(--mute);font-weight:700;letter-spac
 .stat .card>span:first-child{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mute)}
 .stat b{display:block;font:700 36px/1.05 var(--f-display);font-variant-numeric:tabular-nums}
 
+.charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px 20px;margin-top:18px}
+.chart{min-width:0}
+.chart .c-title{font-weight:700}
+.chart svg{display:block;width:100%;height:auto;margin-top:4px;overflow:visible}
+.chart .gl{stroke:var(--line);stroke-width:1}
+.chart .ax{fill:var(--mute);font:12px var(--f-body);font-variant-numeric:tabular-nums}
+.chart .val{fill:var(--ink);font:700 13px var(--f-body)}
+.chart .ln{fill:none;stroke:var(--green-ink);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.chart .pt{fill:var(--green-ink);stroke:var(--card);stroke-width:2}
+.chart .br{fill:var(--green)}
+.chart .hit{fill:transparent;cursor:pointer}
+.chart rect.hit:hover{fill:rgba(127,127,127,.08)}
+#tip{position:fixed;z-index:40;max-width:260px;background:var(--ink);color:var(--bg);padding:7px 11px;border-radius:9px;font-size:14px;line-height:1.35;pointer-events:none;box-shadow:var(--shadow)}
+.chip.tk{border-color:var(--av1i);color:var(--av1i)}
+.chip.tk.on{background:var(--av1i);color:var(--card);border-color:var(--av1i)}
 @media(max-width:640px){.g2{grid-template-columns:1fr}th,td{padding:10px 5px}h2{font-size:27px}.tile .t-num{font-size:40px}}
 @media(max-width:560px){
   .sheet{margin:auto 0 0;width:100%;border-radius:22px 22px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom,0px))}
@@ -235,6 +250,7 @@ label{display:block;font-size:13px;color:var(--mute);font-weight:700;letter-spac
 <nav id="nav" class="tabbar" aria-label="Bereiche"></nav>
 <div id="modal"></div>
 <div id="dlg"></div>
+<div id="tip" role="status" hidden></div>
 <input type="file" id="importFile" accept="application/json" hidden>
 
 <script>
@@ -302,7 +318,8 @@ function seed() {
     marinade: 0.5,
     prices: 1,
     customers: [],
-    batches: []
+    batches: [],
+    freezerOut: []
   };
 }
 
@@ -316,7 +333,8 @@ function normalize(d) {
   if (!d.prices) addPriceList(d);
   d.marinade ??= 0.5;
   d.species.forEach(s => s.products.forEach(p => { p.unit ||= 'kg'; p.avgKg ||= 0; }));
-  d.batches.forEach(b => b.orders.forEach(o => o.lines.forEach(l => { l.kg ??= ''; })));
+  d.batches.forEach(b => { b.frozen ||= {}; b.orders.forEach(o => o.lines.forEach(l => { l.kg ??= ''; })); });
+  d.freezerOut ||= [];
   return d;
 }
 /* Einmalig: Preisliste und neue Produkte/Tierarten in schon vorhandene Daten übernehmen,
@@ -342,7 +360,7 @@ function addPriceList(d) {
    Aufbau: config/main (Tierarten, Produkte, Preise), customers/<id>, batches/<id>, orders/<id>.
    save() vergleicht den aktuellen Stand mit dem zuletzt bekannten und schreibt nur geänderte Dokumente. */
 let DB = null, loaded = false, sync = 'local', syncMsg = '', pendingRender = false;
-const COLLS = ['config', 'customers', 'batches', 'orders'];
+const COLLS = ['config', 'customers', 'batches', 'orders', 'freezer'];
 const snaps = Object.fromEntries(COLLS.map(c => [c, null]));
 const remote = new Map();   // Pfad -> JSON, wie in der Datenbank (bzw. gerade geschrieben)
 const chains = new Map();   // Pfad -> laufender Schreibvorgang (pro Dokument immer nur einer)
@@ -361,6 +379,7 @@ function docsOf(d) {
     m.set('batches/' + id, rest);
     orders.forEach(o => { const { id: oid, ...ob } = o; m.set('orders/' + oid, { ...ob, batchId: id }); });
   });
+  (d.freezerOut || []).forEach(e => { const { id, ...rest } = e; m.set('freezer/' + id, rest); });
   return m;
 }
 function buildState() {
@@ -374,6 +393,7 @@ function buildState() {
     const b = d.batches.find(x => x.id === o.batchId);
     if (b) { const { batchId, ...rest } = clone(o); b.orders.push({ id, ...rest }); }
   });
+  d.freezerOut = [...snaps.freezer].map(([id, e]) => ({ id, ...clone(e) })).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   return normalize(d);
 }
 
@@ -499,17 +519,20 @@ const sure = t => dialog(t, { ok: 'Ja', danger: true });
 const ask = (t, v = '') => dialog(t, { input: v });
 
 /* Bestand eines Schlachttermins berechnen */
-function calc(batch, orders = batch.orders) {
+function calc(batch, orders = batch.orders, frozen = batch.frozen || {}) {
   const s = sp(batch.speciesId);
   const total = {}, used = {}, rem = {}, per = {}, avail = {}, util = {};
   s.parts.forEach(p => { total[p.id] = batch.count * p.perAnimal; used[p.id] = 0; });
-  s.products.forEach(p => { per[p.id] = { res: 0, sold: 0 }; });
+  s.products.forEach(p => { per[p.id] = { res: 0, sold: 0, frozen: 0 }; });
+  const use = (p, q) => { for (const k in p.uses) if (k in used) used[k] += q * p.uses[k]; };
+  for (const pid in frozen) { const p = s.products.find(x => x.id === pid); if (p) { per[pid].frozen += +frozen[pid] || 0; use(p, +frozen[pid] || 0); } }
   orders.forEach(o => o.lines.forEach(l => {
+    if (l.tk) return;
     const p = s.products.find(x => x.id === l.productId);
     if (!p) return;
     const q = +l.qty || 0;
     per[p.id][o.status === 'sold' ? 'sold' : 'res'] += q;
-    for (const k in p.uses) if (k in used) used[k] += q * p.uses[k];
+    use(p, q);
   }));
   s.parts.forEach(p => { rem[p.id] = total[p.id] - used[p.id]; });
   s.products.forEach(p => {
@@ -524,7 +547,7 @@ function calc(batch, orders = batch.orders) {
    est = true heißt geschätzt, none = true heißt kein Preis hinterlegt. */
 function lineVal(l, s) {
   if (l.price !== '' && l.price != null) return { v: +l.price || 0, est: false };
-  const p = s.products.find(x => x.id === l.productId);
+  const p = prodOf(l, s);
   if (!p || !p.price) return { v: 0, est: false, none: true };
   const price = p.price + (l.mar ? +S.marinade || 0 : 0);
   if (p.unit === 'stk') return { v: price * (+l.qty || 0), est: false };
@@ -533,6 +556,29 @@ function lineVal(l, s) {
   return { v: 0, est: false, none: true };
 }
 const r2 = n => Math.round(n * 100) / 100;
+/* Produkt einer Position – bei Tiefkühler-Ware (tk = Tierart) aus deren Produktliste */
+const lineSp = (l, s) => l.tk ? sp(l.tk) || s : s;
+const prodOf = (l, s) => lineSp(l, s).products.find(x => x.id === l.productId);
+function lineName(l, s) {
+  const p = prodOf(l, s);
+  if (!p) return l.text || 'Sonderwunsch';
+  const ls = lineSp(l, s);
+  return l.tk ? `❄ ${ls.id !== s.id ? ls.name + ' ' : ''}${p.name}` : p.name;
+}
+/* Tiefkühler-Bestand je Tierart+Produkt: eingefroren – reserviert/abgeholt – Eigenverbrauch.
+   skipOrder/extra: für die Warnung im Bestell-Fenster (Entwurf statt gespeicherter Bestellung) */
+function freezer(skipOrder = null, extra = null) {
+  const m = new Map();
+  const get = (sid, pid) => { const k = sid + ':' + pid; if (!m.has(k)) m.set(k, { sid, pid, in: 0, res: 0, sold: 0, out: 0 }); return m.get(k); };
+  S.batches.forEach(b => {
+    for (const pid in b.frozen || {}) if (+b.frozen[pid]) get(b.speciesId, pid).in += +b.frozen[pid];
+    b.orders.forEach(o => { if (o.id !== skipOrder) o.lines.forEach(l => { if (l.tk) get(l.tk, l.productId)[o.status === 'sold' ? 'sold' : 'res'] += +l.qty || 0; }); });
+  });
+  if (extra) extra.lines.forEach(l => { if (l.tk) get(l.tk, l.productId).res += +l.qty || 0; });
+  S.freezerOut.forEach(e => { get(e.speciesId, e.productId).out += +e.qty || 0; });
+  m.forEach(x => { x.left = x.in - x.res - x.sold - x.out; x.sp = sp(x.sid); x.p = x.sp?.products.find(p => p.id === x.pid); });
+  return [...m.values()].filter(x => x.sp && x.p);
+}
 function orderVal(o, s) {
   let v = 0, est = false;
   o.lines.forEach(l => { const x = lineVal(l, s); v += x.v; est ||= x.est; });
@@ -563,10 +609,10 @@ function avatar(name) {
 /* Positionen als kleine Etiketten: „2× Brust“, Gewicht, Hinweis */
 function itemChips(o, s) {
   return o.lines.map(l => {
-    const p = s.products.find(x => x.id === l.productId);
+    const p = prodOf(l, s);
     const kg = l.kg !== '' && l.kg != null ? ` <i>${fmt(+l.kg)} kg</i>` : '';
     const n = noteText(l);
-    return `<span class="ic"><b>${fmt(+l.qty || 0)}×</b> ${esc(p ? p.name : (l.text || 'Sonderwunsch'))}${kg}</span>${n ? `<span class="ic note">${esc(n)}</span>` : ''}`;
+    return `<span class="ic"><b>${fmt(+l.qty || 0)}×</b> ${esc(lineName(l, s))}${kg}</span>${n ? `<span class="ic note">${esc(n)}</span>` : ''}`;
   }).join('');
 }
 
@@ -585,8 +631,8 @@ function render() {
 const noteText = l => [l.mar ? 'mariniert' : '', l.note].filter(Boolean).join(', ');
 const batchLabel = b =>`${sp(b.speciesId).name} · ${dateDE(b.date)}`;
 function lineText(l, s) {
-  const p = s.products.find(x => x.id === l.productId);
-  return `${fmt(+l.qty || 0)}× ${esc(p ? p.name : (l.text || 'Sonderwunsch'))}`;
+  const p = prodOf(l, s);
+  return `${fmt(+l.qty || 0)}× ${esc(lineName(l, s))}`;
 }
 
 /* Verkauf: Kunde kommt -> Namen suchen -> Bestellung antippen */
@@ -637,11 +683,11 @@ function drawSale() {
   const m = ui.modal, b = batchOf(m.batchId), s = sp(b.speciesId), d = m.d;
   const numVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
   const lines = d.lines.map(l => {
-    const p = s.products.find(x => x.id === l.productId);
+    const p = prodOf(l, s);
     const kg = p && p.unit !== 'stk' ? `<input class="num" type="text" inputmode="decimal" data-f="kg" value="${numVal(l.kg)}" placeholder="kg" aria-label="Gewicht in kg">` : '';
     return `<div class="sale-line" data-l="${l.id}">
       <div class="sale-q">${fmt(+l.qty || 0)}×</div>
-      <div class="sale-p"><b>${esc(p ? p.name : (l.text || 'Sonderwunsch'))}</b>${noteText(l) ? `<br><span class="sale-note">${esc(noteText(l))}</span>` : ''}</div>
+      <div class="sale-p"><b>${esc(lineName(l, s))}</b>${noteText(l) ? `<br><span class="sale-note">${esc(noteText(l))}</span>` : ''}</div>
       <div class="sale-in">${kg}<input class="num" type="text" inputmode="decimal" data-f="price" value="${numVal(l.price)}" placeholder="${pricePh(l, s)}" aria-label="Betrag in Euro"></div>
     </div>`;
   }).join('');
@@ -660,21 +706,24 @@ function drawSale() {
 
 function viewBestand() {
   const batches = [...S.batches].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  if (!batches.find(b => b.id === ui.batchId)) ui.batchId = batches[0]?.id || null;
+  if (ui.batchId !== 'tk' && !batches.find(b => b.id === ui.batchId)) ui.batchId = batches[0]?.id || null;
+  const tkLeft = freezer().reduce((a, x) => a + Math.max(0, x.left), 0);
   const chips = batches.map(b => `<button class="chip ${b.id === ui.batchId ? 'on' : ''}" data-a="batch" data-v="${b.id}">${esc(sp(b.speciesId).name)} · ${dateDE(b.date)}</button>`).join('');
   let html = `<div class="phead"><div><div class="eyebrow">Schlachttermine</div><h2>Bestand</h2></div></div>
-    <div class="chips">${chips}<button class="chip add" data-a="newbatch">＋ Neuer Termin</button></div>`;
+    <div class="chips"><button class="chip tk ${ui.batchId === 'tk' ? 'on' : ''}" data-a="batch" data-v="tk">❄ Tiefkühler${tkLeft ? ' · ' + fmt(tkLeft) : ''}</button>${chips}<button class="chip add" data-a="newbatch">＋ Neuer Termin</button></div>`;
+  if (ui.batchId === 'tk') return html + viewFreezer();
   const b = batchOf(ui.batchId);
   if (!b) return html + emptyBox('egg', 'Noch kein Schlachttermin angelegt.', '<div style="margin-top:14px"><button class="b pri" data-a="newbatch">Ersten Schlachttermin anlegen</button></div>');
 
   const s = sp(b.speciesId), c = calc(b);
   let nRes = 0, nSold = 0;
   b.orders.forEach(o => o.status === 'sold' ? nSold++ : nRes++);
+  const nFrozen = Object.values(b.frozen || {}).reduce((a, v) => a + (+v || 0), 0);
   const tiles = s.products.map(p => {
     const a = c.avail[p.id], pr = c.per[p.id];
     const cls = a === null ? 'na' : a < 0 ? 'neg' : a === 0 ? 'zero' : 'ok';
     const num = a === null ? '–' : a;
-    const meta = [pr.res ? fmt(pr.res) + ' res.' : '', pr.sold ? fmt(pr.sold) + ' abgeh.' : ''].filter(Boolean).join(' · ');
+    const meta = [pr.res ? fmt(pr.res) + ' res.' : '', pr.sold ? fmt(pr.sold) + ' abgeh.' : '', pr.frozen ? '❄ ' + fmt(pr.frozen) : ''].filter(Boolean).join(' · ');
     return `<div class="tile ${cls}">
       <span class="t-name">${esc(p.name)}</span>
       <span class="t-num">${num}${a !== null ? `<small>${a < 0 ? 'zu viel' : 'frei'}</small>` : ''}</span>
@@ -687,8 +736,9 @@ function viewBestand() {
   html += `<div class="card hero">
       <div><div class="eyebrow">${dateDE(b.date)}</div><h2>${esc(s.name)}</h2></div>
       <button class="b sm" data-a="editbatch">Bearbeiten</button>
-      <div class="facts"><div><b>${b.count}</b><span>geschlachtet</span></div><div><b>${nRes}</b><span>reserviert</span></div><div><b>${nSold}</b><span>abgeholt</span></div></div>
+      <div class="facts"><div><b>${b.count}</b><span>geschlachtet</span></div><div><b>${nRes}</b><span>reserviert</span></div><div><b>${nSold}</b><span>abgeholt</span></div>${nFrozen ? `<div><b>${fmt(nFrozen)}</b><span>eingefroren</span></div>` : ''}</div>
       ${b.note ? `<div class="mute" style="grid-column:1/-1">${esc(b.note)}</div>` : ''}
+      <div style="grid-column:1/-1;margin-top:6px"><button class="b sm" data-a="freeze">❄ ${nFrozen ? 'Eingefrorenes ändern' : 'Rest einfrieren'}</button></div>
     </div>
     <div class="tiles">${tiles}</div>
     <h3>Teile übrig</h3><div class="parts">${parts}</div>`;
@@ -708,6 +758,48 @@ function viewBestand() {
     </div>`;
   }).join('');
   return html;
+}
+
+/* Tiefkühler: was aus allen Schlachtungen eingefroren wurde und noch da ist */
+function viewFreezer() {
+  const items = freezer().sort((a, b) => a.sp.name.localeCompare(b.sp.name, 'de') || a.p.name.localeCompare(b.p.name, 'de'));
+  const intro = `<div class="card hero"><div><div class="eyebrow">Reste aus den Schlachtungen</div><h2>❄ Tiefkühler</h2></div>
+    <div class="mute" style="grid-column:1/-1">Einfrieren geht beim jeweiligen Schlachttermin über „Rest einfrieren“. Tiefkühler-Ware kann in jeder Bestellung mitverkauft werden (Produktauswahl ganz unten). Was ihr selbst verbraucht, hier mit „Eigenverbrauch“ austragen.</div></div>`;
+  if (!items.length) return intro + emptyBox('egg', 'Noch nichts eingefroren.');
+  const bySp = {};
+  items.forEach(x => (bySp[x.sp.name] ||= []).push(x));
+  const groups = Object.entries(bySp).map(([name, xs]) => `<h3>${esc(name)}</h3><div class="tiles">${xs.map(x => {
+    const cls = x.left < 0 ? 'neg' : x.left === 0 ? 'zero' : 'ok';
+    const meta = [x.res ? fmt(x.res) + ' res.' : '', x.sold ? fmt(x.sold) + ' verkauft' : '', x.out ? fmt(x.out) + ' selbst' : ''].filter(Boolean).join(' · ');
+    return `<div class="tile ${cls}"><span class="t-name">${esc(x.p.name)}</span>
+      <span class="t-num">${fmt(x.left)}<small>da</small></span>
+      <span class="t-sub">${fmt(x.in)} eingefroren${meta ? ' · ' + meta : ''}</span>
+      ${x.left > 0 ? `<button class="b sm" style="margin-top:10px" data-a="tkout" data-v="${x.sid}|${x.pid}">Eigenverbrauch</button>` : ''}
+    </div>`;
+  }).join('')}</div>`).join('');
+  const log = [...S.freezerOut].reverse().slice(0, 30).map(e => {
+    const s = sp(e.speciesId), p = s?.products.find(x => x.id === e.productId);
+    return `<tr><td>${dateDE(e.date)}</td><td>${esc(s ? s.name : '?')} ${esc(p ? p.name : '?')}</td><td class="n">${fmt(+e.qty || 0)}</td><td class="n"><button class="b sm dan" data-a="tkoutdel" data-v="${e.id}" aria-label="Eintrag löschen">✕</button></td></tr>`;
+  }).join('');
+  return intro + groups + (log ? `<h3>Eigenverbrauch</h3><div class="card scroll"><table><tr><th>Datum</th><th>Ware</th><th class="n">Stück</th><th></th></tr>${log}</table></div>` : '');
+}
+function freezeModal(b) {
+  const s = sp(b.speciesId), c = calc(b, b.orders, {});
+  const rows = s.products.filter(p => c.avail[p.id] !== null).map(p => {
+    const cur = +(b.frozen || {})[p.id] || 0;
+    return `<div class="line row" style="flex-wrap:nowrap"><div class="sp" style="min-width:0"><b>${esc(p.name)}</b><div class="mute">ohne Einfrieren frei: ${fmt(Math.max(0, c.avail[p.id]))}</div></div>
+      <input class="num" style="width:96px;flex:none" type="text" inputmode="decimal" data-fz="${p.id}" value="${cur ? String(cur).replace('.', ',') : ''}" placeholder="0" aria-label="${esc(p.name)} einfrieren"></div>`;
+  }).join('');
+  ui.modal = { type: 'freeze', batchId: b.id };
+  openModal(`<div class="eyebrow">${esc(batchLabel(b))}</div><h2>❄ Rest einfrieren</h2>
+    <div class="mute" style="margin:6px 0 12px">Trag ein, wie viele Stück ihr von jedem Produkt eingefroren habt. Sie zählen dann nicht mehr als frei bei diesem Termin, sondern liegen im Tiefkühler.</div>
+    ${rows}<div id="fzwarn"></div>
+    <div class="row" style="margin-top:16px"><span class="sp"></span><button class="b" data-a="close">Abbrechen</button><button class="b pri" data-a="savefreeze">Speichern</button></div>`);
+}
+function readFreeze() {
+  const fz = {};
+  document.querySelectorAll('#modal [data-fz]').forEach(el => { const v = parseNum(el.value); if (v > 0) fz[el.dataset.fz] = v; });
+  return fz;
 }
 
 function viewKunden() {
@@ -730,6 +822,7 @@ function viewUmsatz() {
   const bs = S.batches.filter(b => ui.year === 'all' || (b.date || '').startsWith(ui.year));
   let sold = 0, soldEst = 0, open = 0, nOrders = 0, noPrice = 0, kgAll = 0;
   const animals = {}, byProd = {}, byCust = {}, byMonth = {}, byBatch = [];
+  const weights = {};   // "Tierart · Produkt" -> [{b, kg, qty}] je Schlachtung, nur gewogene Stücke
   bs.forEach(b => {
     const s = sp(b.speciesId), c = calc(b);
     animals[s.name] = (animals[s.name] || 0) + b.count;
@@ -745,19 +838,27 @@ function viewUmsatz() {
         const m = (b.date || '').slice(0, 7); byMonth[m] = (byMonth[m] || 0) + sum;
       } else { open += sum; bOpen += sum; }
       o.lines.forEach(l => {
-        const p = s.products.find(x => x.id === l.productId);
-        const key = p ? `${s.name} ${p.name}` : 'Sonderwünsche';
+        const p = prodOf(l, s);
+        const key = p ? `${lineSp(l, s).name} ${p.name}${l.tk ? ' (Tiefkühler)' : ''}` : 'Sonderwünsche';
         const x = byProd[key] ||= { res: 0, done: 0, kg: 0, kgQty: 0, sum: 0 };
         const q = +l.qty || 0;
         if (!done) { x.res += q; return; }
         const lv = lineVal(l, s);
         x.done += q; x.sum += lv.v; bPcs += q;
-        if (l.kg !== '' && l.kg != null) { x.kg += +l.kg; x.kgQty += q; bKg += +l.kg; kgAll += +l.kg; }
+        if (l.kg !== '' && l.kg != null) {
+          x.kg += +l.kg; x.kgQty += q; bKg += +l.kg; kgAll += +l.kg;
+          if (p && !l.tk && q) {
+            const arr = weights[`${s.name} · ${p.name}`] ||= [];
+            let w = arr.find(e => e.b === b); if (!w) arr.push(w = { b, kg: 0, qty: 0 });
+            w.kg += +l.kg; w.qty += q;
+          }
+        }
         if (lv.est) soldEst += lv.v;
         if (lv.none && p) noPrice++;
       });
     });
-    byBatch.push({ b, s, bSold, bOpen, bPcs, bKg, util });
+    const bFrozen = Object.values(b.frozen || {}).reduce((a, v) => a + (+v || 0), 0);
+    byBatch.push({ b, s, bSold, bOpen, bPcs, bKg, util, bFrozen });
   });
   const bars = (obj, fmtKey = k => k) => {
     const e = Object.entries(obj).sort((a, b) => b[1] - a[1]); const max = e[0]?.[1] || 1;
@@ -766,21 +867,92 @@ function viewUmsatz() {
   const kgTxt = n => n ? fmt(n) + ' kg' : '';
   const prodRows = Object.entries(byProd).sort((a, b) => b[1].sum - a[1].sum || b[1].res - a[1].res).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${v.res ? fmt(v.res) : ''}</td><td class="n">${v.done ? fmt(v.done) : ''}</td><td class="n">${kgTxt(v.kg)}</td><td class="n">${v.kgQty ? fmt(v.kg / v.kgQty) + ' kg' : ''}</td><td class="n">${v.sum ? eur(v.sum) : ''}</td></tr>`).join('');
   const monthName = m => new Date(m + '-01T12:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-  const batchRows = byBatch.sort((a, b) => (b.b.date || '').localeCompare(a.b.date || '')).map(x => `<tr><td>${esc(x.s.name)} · ${dateDE(x.b.date)}</td><td class="n">${x.b.count}</td><td class="n">${Math.round(x.util * 100)} %</td><td class="n">${x.b.orders.length}</td><td class="n">${x.bPcs ? fmt(x.bPcs) : ''}</td><td class="n">${kgTxt(x.bKg)}</td><td class="n">${eur(x.bSold)}</td><td class="n mute">${x.bOpen ? eur(x.bOpen) : ''}</td></tr>`).join('');
-  const sumRow = byBatch.length > 1 ? `<tr style="font-weight:700"><td>Summe</td><td class="n">${byBatch.reduce((a, x) => a + x.b.count, 0)}</td><td></td><td class="n">${byBatch.reduce((a, x) => a + x.b.orders.length, 0)}</td><td class="n">${fmt(byBatch.reduce((a, x) => a + x.bPcs, 0))}</td><td class="n">${kgTxt(kgAll)}</td><td class="n">${eur(sold)}</td><td class="n">${open ? eur(open) : ''}</td></tr>` : '';
+  const batchRows = byBatch.sort((a, b) => (b.b.date || '').localeCompare(a.b.date || '')).map(x => `<tr><td>${esc(x.s.name)} · ${dateDE(x.b.date)}</td><td class="n">${x.b.count}</td><td class="n">${Math.round(x.util * 100)} %</td><td class="n">${x.b.orders.length}</td><td class="n">${x.bPcs ? fmt(x.bPcs) : ''}</td><td class="n">${x.bFrozen ? fmt(x.bFrozen) : ''}</td><td class="n">${kgTxt(x.bKg)}</td><td class="n">${eur(x.bSold)}</td><td class="n mute">${x.bOpen ? eur(x.bOpen) : ''}</td></tr>`).join('');
+  const sumRow = byBatch.length > 1 ? `<tr style="font-weight:700"><td>Summe</td><td class="n">${byBatch.reduce((a, x) => a + x.b.count, 0)}</td><td></td><td class="n">${byBatch.reduce((a, x) => a + x.b.orders.length, 0)}</td><td class="n">${fmt(byBatch.reduce((a, x) => a + x.bPcs, 0))}</td><td class="n">${fmt(byBatch.reduce((a, x) => a + x.bFrozen, 0)) || ''}</td><td class="n">${kgTxt(kgAll)}</td><td class="n">${eur(sold)}</td><td class="n">${open ? eur(open) : ''}</td></tr>` : '';
   const monthsObj = Object.fromEntries(Object.entries(byMonth).sort());
   const animalTxt = Object.entries(animals).map(([k, v]) => `${v} ${esc(k)}`).join(', ') || 'keine';
+  const tk = freezer().reduce((a, x) => ({ in: a.in + x.in, left: a.left + Math.max(0, x.left), out: a.out + x.out, sold: a.sold + x.sold }), { in: 0, left: 0, out: 0, sold: 0 });
+  /* Diagramme: gewogenes Gewicht je Schlachtung und Ø Stückgewicht je Produkt, in Datumsreihenfolge */
+  const chrono = (a, b) => (a.b.date || '').localeCompare(b.b.date || '');
+  const kgBatches = byBatch.filter(x => x.bKg > 0).sort(chrono);
+  const weightCharts = Object.entries(weights).sort((a, b) => a[0].localeCompare(b[0], 'de')).map(([k, arr]) => {
+    const pts = arr.sort(chrono).map(w => ({ x: w.b.date, v: w.kg / w.qty, tip: `${dateDE(w.b.date)}: Ø ${fmt(w.kg / w.qty)} kg pro Stück (${fmt(w.qty)} Stück, ${fmt(w.kg)} kg gewogen)` }));
+    return `<div class="chart"><div class="c-title">${esc(k)}</div><div class="mute">Ø kg pro Stück</div>${lineChart(pts)}</div>`;
+  }).join('');
+  const weightSection = kgBatches.length ? `<div class="card"><h3 style="margin:0 0 4px">Gewicht je Schlachtung</h3>
+      <div class="mute">Nur Stücke, die beim Abholen gewogen wurden. Auf einen Punkt oder Balken tippen zeigt die Zahlen.</div>
+      <div class="chart" style="margin-top:12px"><div class="c-title">Gewogen gesamt</div><div class="mute">kg je Schlachtung</div>${barChart(kgBatches.map(x => ({ x: x.b.date, v: x.bKg, tip: `${x.s.name} ${dateDE(x.b.date)}: ${fmt(x.bKg)} kg gewogen` })))}</div>
+      ${weightCharts ? `<div class="charts">${weightCharts}</div>` : ''}</div>`
+    : `<div class="card"><h3 style="margin:0 0 4px">Gewicht je Schlachtung</h3><div class="empty">${ICON.umsatz}Noch nichts gewogen. Sobald beim Abholen Gewichte eingetragen werden, erscheinen hier die Diagramme.</div></div>`;
   return `<div class="phead"><div><div class="eyebrow">Auswertung</div><h2>Statistik</h2></div></div>
   <div class="chips"><button class="chip ${ui.year === 'all' ? 'on' : ''}" data-a="year" data-v="all">Gesamt</button>${years.map(y => `<button class="chip ${ui.year === y ? 'on' : ''}" data-a="year" data-v="${y}">${y}</button>`).join('')}</div>
   <div class="stat"><div class="card"><span class="mute">Umsatz (abgeholt)</span><b>${eur(sold)}</b>${soldEst ? `<span class="mute">davon geschätzt ${eur(soldEst)}</span>` : ''}</div>
   <div class="card"><span class="mute">Noch offen (reserviert, geschätzt)</span><b>${eur(open)}</b></div>
   <div class="card"><span class="mute">Schlachtungen</span><b>${bs.length}</b><span class="mute">${animalTxt}</span></div>
-  <div class="card"><span class="mute">Gewogen (abgeholt)</span><b>${kgAll ? fmt(kgAll) + ' kg' : '–'}</b><span class="mute">${nOrders} abgeholte Bestellungen</span></div></div>
+  <div class="card"><span class="mute">Gewogen (abgeholt)</span><b>${kgAll ? fmt(kgAll) + ' kg' : '–'}</b><span class="mute">${nOrders} abgeholte Bestellungen</span></div>
+  ${tk.in ? `<div class="card"><span class="mute">Tiefkühler (gesamt)</span><b>${fmt(tk.left)} da</b><span class="mute">${fmt(tk.in)} eingefroren · ${fmt(tk.sold)} verkauft · ${fmt(tk.out)} selbst</span></div>` : ''}</div>
   ${noPrice ? `<div class="warn">⚠ ${noPrice} abgeholte Position(en) ohne Preis – bitte Preise unter Einstellungen eintragen (und Ø-Gewicht für die Schätzung).</div>` : ''}
-  <div class="card"><h3 style="margin:0 0 10px">Alle Schlachtungen</h3><div class="mute">„Verplant“ zeigt das knappste Teil: so viel davon ist reserviert oder abgeholt. 100 % heißt, es ist ausverkauft.</div>${batchRows ? `<div class="scroll"><table><tr><th>Termin</th><th class="n">Tiere</th><th class="n">Verplant</th><th class="n">Bestell.</th><th class="n">Stück abgeh.</th><th class="n">Gewogen</th><th class="n">Umsatz</th><th class="n">Offen</th></tr>${batchRows}${sumRow}</table></div>` : '<div class="empty">Noch keine Termine.</div>'}</div>
+  ${weightSection}
+  <div class="card"><h3 style="margin:0 0 10px">Alle Schlachtungen</h3><div class="mute">„Verplant“ zeigt das knappste Teil: so viel davon ist reserviert oder abgeholt. 100 % heißt, es ist ausverkauft.</div>${batchRows ? `<div class="scroll"><table><tr><th>Termin</th><th class="n">Tiere</th><th class="n">Verplant</th><th class="n">Bestell.</th><th class="n">Stück abgeh.</th><th class="n">Eingefr.</th><th class="n">Gewogen</th><th class="n">Umsatz</th><th class="n">Offen</th></tr>${batchRows}${sumRow}</table></div>` : '<div class="empty">Noch keine Termine.</div>'}</div>
   <div class="card"><h3 style="margin:0 0 10px">Pro Produkt</h3><div class="mute">Ø Gewicht zählt nur Stücke, die gewogen wurden.</div>${prodRows ? `<div class="scroll"><table><tr><th>Produkt</th><th class="n">Reserviert</th><th class="n">Abgeholt</th><th class="n">Gewogen</th><th class="n">Ø pro Stück</th><th class="n">Umsatz</th></tr>${prodRows}</table></div>` : '<div class="empty">Noch keine Bestellungen.</div>'}</div>
   <div class="card"><h3 style="margin:0 0 10px">Pro Kunde</h3>${bars(byCust)}</div>
   <div class="card"><h3 style="margin:0 0 10px">Pro Monat</h3>${bars(monthsObj, monthName)}</div>`;
+}
+
+/* ---------- Diagramme (SVG, eine Reihe je Diagramm, Farben aus den Tokens) ---------- */
+const shortDate = d => d ? new Date(d + 'T12:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : '';
+function axisTicks(lo, hi) {
+  const step = [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000].find(s => (hi - lo) / s <= 4) || 1000;
+  const out = []; for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v * 1000) / 1000 || 0);
+  return out;
+}
+function xLabels(pts, xAt, y) {
+  const every = Math.ceil(pts.length / 6);
+  return pts.map((p, i) => (i % every === 0 || i === pts.length - 1) ? `<text class="ax" x="${xAt(i)}" y="${y}" text-anchor="middle">${shortDate(p.x)}</text>` : '').join('');
+}
+function lineChart(pts) {
+  const W = 320, H = 160, L = 42, R = 16, T = 18, B = 26;
+  const vs = pts.map(p => p.v);
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  const pad = Math.max((hi - lo) * 0.3, hi * 0.1, 0.02);
+  lo = Math.max(0, lo - pad); hi += pad;
+  const ticks = axisTicks(lo, hi); lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+  const xAt = i => pts.length === 1 ? (L + W - R) / 2 : L + i * (W - L - R) / (pts.length - 1);
+  const yAt = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  const grid = ticks.map(v => `<line class="gl" x1="${L}" x2="${W - R}" y1="${yAt(v)}" y2="${yAt(v)}"/><text class="ax" x="${L - 6}" y="${yAt(v) + 4}" text-anchor="end">${fmt(v)}</text>`).join('');
+  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${xAt(i).toFixed(1)},${yAt(p.v).toFixed(1)}`).join('');
+  const last = pts.length - 1;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(pts.map(p => p.tip).join('; '))}">${grid}
+    ${pts.length > 1 ? `<path class="ln" d="${path}"/>` : ''}
+    ${pts.map((p, i) => `<circle class="pt" cx="${xAt(i)}" cy="${yAt(p.v)}" r="4.5"/><circle class="hit" cx="${xAt(i)}" cy="${yAt(p.v)}" r="16" data-tip="${esc(p.tip)}"/>`).join('')}
+    <text class="val" x="${Math.min(xAt(last), W - R - 4)}" y="${yAt(pts[last].v) - 10}" text-anchor="${pts.length === 1 ? 'middle' : 'end'}">${fmt(pts[last].v)} kg</text>
+    ${xLabels(pts, xAt, H - 6)}</svg>`;
+}
+function barChart(pts) {
+  const W = 640, H = 170, L = 46, R = 10, T = 18, B = 26;
+  const ticks = axisTicks(0, Math.max(...pts.map(p => p.v)) * 1.1); const hi = ticks[ticks.length - 1] || 1;
+  const slot = (W - L - R) / pts.length, bw = Math.min(46, slot * 0.6);
+  const xAt = i => L + slot * (i + 0.5);
+  const yAt = v => T + (hi - v) / hi * (H - T - B);
+  const grid = ticks.map(v => `<line class="gl" x1="${L}" x2="${W - R}" y1="${yAt(v)}" y2="${yAt(v)}"/><text class="ax" x="${L - 6}" y="${yAt(v) + 4}" text-anchor="end">${fmt(v)}</text>`).join('');
+  const bars = pts.map((p, i) => {
+    const x = xAt(i) - bw / 2, y = yAt(p.v), h = yAt(0) - y, r = Math.min(4, h);
+    return `<path class="br" d="M${x},${yAt(0)}V${y + r}Q${x},${y} ${x + r},${y}H${x + bw - r}Q${x + bw},${y} ${x + bw},${y + r}V${yAt(0)}Z"/>
+      <rect class="hit" x="${xAt(i) - slot / 2}" y="${T}" width="${slot}" height="${H - T - B}" data-tip="${esc(p.tip)}"/>`;
+  }).join('');
+  const maxI = pts.reduce((m, p, i) => p.v > pts[m].v ? i : m, 0);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(pts.map(p => p.tip).join('; '))}">${grid}${bars}
+    <text class="val" x="${xAt(maxI)}" y="${yAt(pts[maxI].v) - 6}" text-anchor="middle">${fmt(pts[maxI].v)} kg</text>
+    ${xLabels(pts, xAt, H - 6)}</svg>`;
+}
+/* Tooltip: Maus darüber oder antippen */
+function showTip(e) {
+  const t = e.target.closest?.('[data-tip]'), tip = $('tip');
+  if (!t) { tip.hidden = true; return; }
+  tip.textContent = t.dataset.tip; tip.hidden = false;
+  const r = t.getBoundingClientRect(), w = tip.offsetWidth;
+  tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + 'px';
+  tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
 }
 
 function viewSettings() {
@@ -837,11 +1009,11 @@ function drawOrder() {
   const m = ui.modal, b = batchOf(m.batchId), s = sp(b.speciesId), d = m.d;
   const numVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
   const lines = d.lines.map(l => {
-    const p = s.products.find(x => x.id === l.productId);
+    const p = prodOf(l, s);
     const showKg = l.productId !== '' && p && p.unit !== 'stk';
     return `<div class="line" data-l="${l.id}">
     <div class="l1">
-      <select data-f="productId">${s.products.map(p => `<option value="${p.id}" ${p.id === l.productId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="" ${l.productId === '' ? 'selected' : ''}>✎ Sonderwunsch</option></select>
+      <select data-f="productId">${s.products.map(p => `<option value="${p.id}" ${!l.tk && p.id === l.productId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="" ${l.productId === '' ? 'selected' : ''}>✎ Sonderwunsch</option>${tkOptions(l, s)}</select>
       <input class="num" type="text" inputmode="decimal" data-f="qty" value="${numVal(l.qty)}" placeholder="Stück">
       ${showKg ? `<input class="num" type="text" inputmode="decimal" data-f="kg" value="${numVal(l.kg)}" placeholder="kg">` : '<span></span>'}
       <input class="num" type="text" inputmode="decimal" data-f="price" value="${numVal(l.price)}" placeholder="${pricePh(l, s)}">
@@ -865,12 +1037,19 @@ function drawOrder() {
     <div class="row" style="margin-top:18px">${m.isNew ? '' : '<button class="b dan" data-a="delorder">Löschen</button>'}<span class="sp"></span><button class="b" data-a="close">Abbrechen</button><button class="b pri" data-a="saveorder">Speichern</button></div>`);
   updateWarn();
 }
+/* Auswahl „Aus dem Tiefkühler“: alles, was noch drin ist (und die schon gewählte Ware) */
+function tkOptions(l, s) {
+  const items = freezer().filter(x => x.left > 0 || (l.tk === x.sid && l.productId === x.pid));
+  if (!items.length) return '';
+  return `<optgroup label="Aus dem Tiefkühler">${items.map(x => `<option value="tk|${x.sid}|${x.pid}" ${l.tk === x.sid && l.productId === x.pid ? 'selected' : ''}>❄ ${x.sid !== s.id ? esc(x.sp.name) + ' ' : ''}${esc(x.p.name)} (${fmt(x.left)} da)</option>`).join('')}</optgroup>`;
+}
 function updateWarn() {
   const m = ui.modal; if (!m || m.type !== 'order') return;
   const b = batchOf(m.batchId), s = sp(b.speciesId);
   const orders = b.orders.filter(o => o.id !== m.d.id).concat({ ...m.d, status: 'res' });
   const c = calc(b, orders);
   const bad = s.parts.filter(p => c.rem[p.id] < -1e-9).map(p => `${p.name} (${fmt(c.rem[p.id])})`);
+  freezer(m.d.id, m.d).forEach(x => { if (x.left < -1e-9 && m.d.lines.some(l => l.tk === x.sid && l.productId === x.pid)) bad.push(`❄ ${x.p.name} im Tiefkühler (${fmt(x.left)})`); });
   $('warn').innerHTML = bad.length ? `<div class="warn">⚠ Nicht genug da: ${bad.join(', ')}</div>` : '';
   const x = orderVal(m.d, s);
   $('o_sum').textContent = (x.est ? '≈ ' : '') + eur(x.v);
@@ -893,7 +1072,7 @@ function download(name, text) {
   a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
-const countInUse = (spId, prodId) => S.batches.filter(b => b.speciesId === spId).some(b => b.orders.some(o => o.lines.some(l => l.productId === prodId)));
+const countInUse = (spId, prodId) => S.batches.some(b => (b.speciesId === spId && (+(b.frozen || {})[prodId] || b.orders.some(o => o.lines.some(l => !l.tk && l.productId === prodId)))) || b.orders.some(o => o.lines.some(l => l.tk === spId && l.productId === prodId))) || S.freezerOut.some(e => e.speciesId === spId && e.productId === prodId);
 
 document.addEventListener('click', async e => {
   const t = e.target.closest('[data-a]'); if (!t) return;
@@ -926,6 +1105,23 @@ document.addEventListener('click', async e => {
       break;
     case 'editorder': { const b = batchOf(ui.batchId); orderModal(b, b.orders.find(o => o.id === v)); break; }
     case 'pickup': saleSheet(ui.batchId, v); break;
+    case 'freeze': freezeModal(batchOf(ui.batchId)); break;
+    case 'savefreeze': {
+      const b = batchOf(ui.modal.batchId), fz = readFreeze(), s = sp(b.speciesId), c = calc(b, b.orders, fz);
+      const bad = s.parts.filter(p => c.rem[p.id] < -1e-9).map(p => p.name);
+      if (bad.length) { $('fzwarn').innerHTML = `<div class="warn">So viel ist nicht übrig: ${esc(bad.join(', '))}. Bitte weniger eintragen.</div>`; break; }
+      b.frozen = fz; closeModal(); stay(); break;
+    }
+    case 'tkout': {
+      const [sid, pid] = v.split('|'), x = freezer().find(y => y.sid === sid && y.pid === pid);
+      const n = await ask(`Wie viele ${x.p.name} (${x.sp.name}) habt ihr selbst aus dem Tiefkühler genommen? Noch da: ${fmt(x.left)}`, '1');
+      const q = n === null ? 0 : parseNum(n);
+      if (q > 0) { S.freezerOut.push({ id: uid(), date: today(), speciesId: sid, productId: pid, qty: q }); stay(); }
+      break;
+    }
+    case 'tkoutdel':
+      if (await sure('Diesen Eigenverbrauch-Eintrag löschen? Die Ware zählt dann wieder als im Tiefkühler.')) { S.freezerOut = S.freezerOut.filter(e => e.id !== v); stay(); }
+      break;
     case 'sale': { const [bid, oid] = v.split(':'); saleSheet(bid, oid); break; }
     case 'salebatch': ui.saleBatch = v; render(); break;
     case 'saledone': ui.saleDone = !ui.saleDone; render(); break;
@@ -1030,7 +1226,9 @@ $('modal').addEventListener('change', e => {
   if (!row || t.dataset.f !== 'productId') return;
   syncOrderHead();
   const l = ui.modal.d.lines.find(x => x.id === row.dataset.l);
-  l.productId = t.value; drawOrder();
+  if (t.value.startsWith('tk|')) { const [, sid, pid] = t.value.split('|'); l.tk = sid; l.productId = pid; }
+  else { delete l.tk; l.productId = t.value; }
+  drawOrder();
 });
 /* Beim Neuzeichnen den getippten Kundennamen behalten */
 const _drawOrder = drawOrder;
@@ -1074,6 +1272,9 @@ async function importJSON(text) {
 
 $('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
 
+$('app').addEventListener('pointerover', showTip);
+$('app').addEventListener('click', showTip);
+addEventListener('scroll', () => { $('tip').hidden = true; }, { passive: true });
 $('app').addEventListener('focusout', () => { if (pendingRender) setTimeout(() => { if (pendingRender) scheduleRender(); }, 0); });
 
 render();
