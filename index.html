@@ -205,6 +205,12 @@ label{display:block;font-size:13px;color:var(--mute);font-weight:700;letter-spac
 .sale-note{display:inline-block;margin-top:5px;background:var(--yolkbg);color:var(--yolkink);border-radius:8px;padding:2px 9px;font-weight:600;font-size:14px}
 .sale-in{display:flex;gap:6px}
 .sale-in input{width:96px}
+.ac{position:relative}
+.ac-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 28px rgba(0,0,0,.18);z-index:8;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.ac-list button{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:6px 12px;background:none;border:0;border-bottom:1px solid var(--line);font:17px var(--f-body);color:var(--ink);text-align:left;cursor:pointer}
+.ac-list button:active{background:var(--soft)}
+.ac-list .av{width:34px;height:34px;font-size:17px}
+.ac-new{padding:11px 12px;font-size:14px;color:var(--mute)}
 .sale-done{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right}
 .sale-done span{font-size:14px;color:var(--mute);font-variant-numeric:tabular-nums}
 .sale-done b{font:700 22px/1 var(--f-display);font-variant-numeric:tabular-nums}
@@ -1110,8 +1116,7 @@ function drawOrder() {
     <input style="margin-top:8px" data-f="note" placeholder="Notiz (z. B. einfrieren, Brüste einzeln)" value="${esc(l.note || '')}"></div>`;
   }).join('');
   openModal(`<h2>${m.pickup ? 'Abholung' : m.isNew ? 'Neue Bestellung' : 'Bestellung'} · ${esc(s.name)} ${dateDE(b.date)}</h2>
-    <label>Kunde</label><input id="o_cust" list="custlist" autocomplete="off" placeholder="Name wählen oder neu eintippen" value="${esc(cust(d.customerId)?.name || '')}">
-    <datalist id="custlist">${S.customers.map(c => `<option value="${esc(c.name)}">`).join('')}</datalist>
+    <label for="o_cust">Kunde</label><div class="ac"><input id="o_cust" autocomplete="off" autocapitalize="words" placeholder="Name antippen oder neu eintippen" value="${esc(cust(d.customerId)?.name || '')}" role="combobox" aria-autocomplete="list" aria-controls="o_cust_list"><div id="o_cust_list" class="ac-list" role="listbox" hidden></div></div>
     <label>Status</label><select id="o_status"><option value="res" ${d.status === 'res' ? 'selected' : ''}>Reserviert</option><option value="sold" ${d.status === 'sold' ? 'selected' : ''}>Abgeholt</option></select>
     <label>Positionen</label>
     <div class="mute" style="margin-bottom:8px">Beim Abholen <b>optional</b> das gewogene Gewicht (kg) oder direkt den Betrag (€) eintragen. Leer lassen heißt, es wird über das Ø-Gewicht geschätzt (≈).</div>
@@ -1213,6 +1218,7 @@ document.addEventListener('click', async e => {
     case 'salebatch': ui.saleBatch = v; render(); break;
     case 'saledone': ui.saleDone = !ui.saleDone; render(); break;
     case 'saleedit': ui.modal.sale = false; ui.modal.pickup = true; ui.modal.d.status = 'sold'; drawOrder(); break;
+    case 'pickcust': $('o_cust').value = v; $('o_cust_list').hidden = true; if (ui.modal?.d) ui.modal.d._name = v; break;
     case 'saleeditkg': ui.modal.editAll = true; drawOrder(); break;
     case 'saveweights': persistSale(); ui.modal.editAll = false; drawOrder(); break;
     case 'weigh': weighModal(ui.batchId); break;
@@ -1338,6 +1344,24 @@ drawOrder = function () {
 
 /* Verkauf: Suche filtert die Liste, ohne neu zu zeichnen (Tastatur bleibt offen) */
 $('app').addEventListener('input', e => { if (e.target.id === 'v_q') { ui.q = e.target.value; filterSale(); } });
+
+/* Kundenfeld im Bestellfenster: eigene Vorschlagsliste (Safari auf iPad/iPhone zeigt <datalist> nicht als Liste) */
+function showCustList() {
+  const inp = $('o_cust'), box = $('o_cust_list'); if (!inp || !box) return;
+  const q = inp.value.trim().toLowerCase();
+  const all = [...S.customers].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const hits = (q ? all.filter(c => c.name.toLowerCase().includes(q)) : all).slice(0, 30);
+  const exact = all.some(c => c.name.toLowerCase() === q);
+  if (!hits.length && !q) { box.hidden = true; return; }
+  box.innerHTML = hits.map(c => `<button type="button" role="option" data-a="pickcust" data-v="${esc(c.name)}">${avatar(c.name)}<span>${esc(c.name)}</span></button>`).join('') +
+    (q && !exact ? `<div class="ac-new">Neuer Kunde: „${esc(inp.value.trim())}“ wird beim Speichern angelegt</div>` : '');
+  box.hidden = false;
+}
+$('modal').addEventListener('focusin', e => { if (e.target.id === 'o_cust') showCustList(); });
+$('modal').addEventListener('input', e => { if (e.target.id === 'o_cust') showCustList(); });
+$('modal').addEventListener('focusout', e => { if (e.target.id === 'o_cust') setTimeout(() => { if ($('o_cust_list') && document.activeElement?.id !== 'o_cust') $('o_cust_list').hidden = true; }, 200); });
+/* Antippen in der Liste soll das Feld nicht zuerst schließen */
+$('modal').addEventListener('pointerdown', e => { if (e.target.closest('.ac-list')) e.preventDefault(); });
 
 /* Einstellungen: Änderungen speichern */
 $('app').addEventListener('change', e => {
