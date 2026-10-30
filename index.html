@@ -92,11 +92,23 @@ h3{font:700 20px/1.1 var(--f-display);margin:22px 0 10px;letter-spacing:.01em}
 .warn{background:var(--redbg);color:var(--red);border-radius:12px;padding:10px 14px;margin:10px 0;font-weight:600}
 
 /* Knöpfe & Chips */
-button.b{font:600 16px var(--f-body);border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:12px;padding:11px 16px;min-height:46px;cursor:pointer;transition:transform .08s}
-button.b:active,.chip:active{transform:scale(.97)}
-button.b.pri{background:var(--green);border-color:var(--green);color:var(--ongreen)}
-button.b.dan{color:var(--red);border-color:var(--redline);background:transparent}
-button.b.sm{padding:6px 13px;min-height:38px;font-size:15px}
+.b{font:600 16px var(--f-body);border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:12px;padding:11px 16px;min-height:46px;cursor:pointer;transition:transform .08s}
+.b:active,.chip:active{transform:scale(.97)}
+.b.pri{background:var(--green);border-color:var(--green);color:var(--ongreen)}
+.b.dan{color:var(--red);border-color:var(--redline);background:transparent}
+.b.sm{padding:6px 13px;min-height:38px;font-size:15px}
+a.b{display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none}
+.b.wa svg{width:20px;height:20px;color:#25a244}
+.rv{background:var(--green);color:var(--ongreen);border-radius:22px;padding:22px 20px;margin-top:6px}
+.rv .eyebrow{color:var(--ongreen);opacity:.75}
+.rv h2{font-size:40px;color:var(--ongreen)}
+.rv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:18px}
+.rv-tile{background:rgba(255,255,255,.1);border-radius:14px;padding:12px 14px}
+.rv-tile b{display:block;font:700 36px/1.05 var(--f-display);color:var(--yolk);font-variant-numeric:tabular-nums}
+.rv-tile span{font-size:14px;opacity:.88}
+.rv-facts{margin:18px 0 0;padding:0;list-style:none;display:grid;gap:10px}
+.rv-facts li{background:rgba(255,255,255,.08);border-radius:12px;padding:11px 14px;font-size:16px;line-height:1.35}
+.rv-facts li b{color:var(--yolk)}
 .big{font-size:19px;padding:14px 24px;min-height:56px}
 .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;margin-bottom:8px;scrollbar-width:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:9px 16px;font:600 15px var(--f-body);cursor:pointer;color:var(--ink)}
@@ -188,7 +200,7 @@ label{display:block;font-size:13px;color:var(--mute);font-weight:700;letter-spac
 .dlg{max-width:440px;margin-top:18vh}
 .dlg p{margin:0 0 12px;font-size:18px}
 @keyframes sheet-in{from{transform:translateY(18px);opacity:0}to{transform:none;opacity:1}}
-@media (prefers-reduced-motion: reduce){.sheet{animation:none}button.b,.chip,.order{transition:none}}
+@media (prefers-reduced-motion: reduce){.sheet{animation:none}.b,.chip,.order{transition:none}}
 .line{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
 .l1{display:grid;grid-template-columns:1fr 72px 84px 112px 46px;gap:8px;align-items:center}
 .lhead{font-size:12px;color:var(--mute);font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:0 13px 5px}
@@ -392,7 +404,7 @@ const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
 function docsOf(d) {
   const m = new Map();
   m.set('config/main', { species: d.species, marinade: d.marinade, prices: d.prices || 1 });
-  d.customers.forEach(c => m.set('customers/' + c.id, { name: c.name }));
+  d.customers.forEach(c => m.set('customers/' + c.id, c.phone ? { name: c.name, phone: c.phone } : { name: c.name }));
   d.batches.forEach(b => {
     const { orders, id, ...rest } = b;
     m.set('batches/' + id, rest);
@@ -405,7 +417,7 @@ function buildState() {
   const clone = x => JSON.parse(JSON.stringify(x));
   const cfg = snaps.config.get('main');
   const d = { version: 1, ...(cfg ? clone(cfg) : { species: seed().species, marinade: 0.5, prices: 1 }), customers: [], batches: [] };
-  snaps.customers.forEach((c, id) => d.customers.push({ id, name: c.name }));
+  snaps.customers.forEach((c, id) => d.customers.push(c.phone ? { id, name: c.name, phone: c.phone } : { id, name: c.name }));
   snaps.batches.forEach((b, id) => d.batches.push({ id, ...clone(b), orders: [] }));
   const orders = [...snaps.orders].sort((a, b) => (a[1].t || 0) - (b[1].t || 0));
   orders.forEach(([id, o]) => {
@@ -591,6 +603,29 @@ function parseKg(v) {
   return Math.round(parts.reduce((a, x) => a + parseNum(x), 0) * 1000) / 1000;
 }
 const kgVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
+/* WhatsApp: Nummer ins internationale Format (0171… -> 49171…), Text je nach Stand der Bestellung */
+function waNumber(p) {
+  let d = String(p || '').replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = d.slice(1); else if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '49' + d.slice(1);
+  return d;
+}
+function waText(o, b) {
+  const s = sp(b.speciesId), first = (cust(o.customerId)?.name || '').trim().split(/\s+/)[0];
+  const weighed = !o.lines.some(l => needsKg(l, s));
+  const items = o.lines.map(l => {
+    const lv = lineVal(l, s), kg = l.kg !== '' && l.kg != null ? ` (${fmt(+l.kg)} kg)` : '';
+    return `• ${fmt(+l.qty || 0)}× ${lineName(l, s)}${noteText(l) ? ', ' + noteText(l) : ''}${kg}${lv.v ? ' – ' + (lv.est ? 'ca. ' : '') + eur(lv.v) : ''}`;
+  }).join('\n');
+  const tot = orderVal(o, s);
+  return weighed
+    ? `Hallo ${first},\ndeine Bestellung ist fertig und kann abgeholt werden:\n${items}\nZusammen: ${eur(tot.v)}\n\nViele Grüße`
+    : `Hallo ${first},\ndanke für deine Bestellung zum Schlachttermin am ${dateDE(b.date)}:\n${items}${tot.v ? `\nVoraussichtlich ca. ${eur(tot.v)} – den genauen Preis gibt es nach dem Wiegen.` : ''}\n\nViele Grüße`;
+}
+const WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.2a9.7 9.7 0 0 0-8.3 14.8L2.4 21.8l4.9-1.3A9.7 9.7 0 1 0 12 2.2zm0 17.7a8 8 0 0 1-4.1-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8 8 0 1 1 12 19.9zm4.4-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.5.1l-.8 1c-.1.2-.3.2-.5.1a6.6 6.6 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5a.9.9 0 0 0-.7.3 2.8 2.8 0 0 0-.9 2.1 4.9 4.9 0 0 0 1 2.6 11.2 11.2 0 0 0 4.3 3.8c1.6.7 2.2.7 3 .6.5-.1 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1l-.5-.3z"/></svg>';
+function waButton(o, b, small = true) {
+  const href = `https://wa.me/${waNumber(cust(o.customerId)?.phone)}?text=${encodeURIComponent(waText(o, b))}`;
+  return `<a class="b wa ${small ? 'sm' : ''}" data-a="wa" href="${href}" target="_blank" rel="noopener">${WA_ICON}WhatsApp</a>`;
+}
 function lineName(l, s) {
   const p = prodOf(l, s);
   if (!p) return l.text || 'Sonderwunsch';
@@ -742,7 +777,7 @@ function drawSale() {
     <div class="mute">${open ? 'Gewicht oben eintragen (bei mehreren Stück das Gewicht zusammen). Es wird sofort gespeichert – der Kunde kann auch später abholen.' : 'Alles gewogen – der Preis steht fest.'}
       ${!open && !m.editAll ? ' <button class="b sm" data-a="saleeditkg" style="margin-left:6px">Gewicht ändern</button>' : ''}</div>
     <div id="warn" hidden></div>
-    <div class="row" style="margin-top:18px"><button class="b" data-a="saleedit">Bearbeiten</button><span class="sp"></span>
+    <div class="row" style="margin-top:18px"><button class="b" data-a="saleedit">Bearbeiten</button>${waButton(d, b, false)}<span class="sp"></span>
       ${open || m.editAll
         ? `<button class="b" data-a="close">Zurück</button><button class="b" data-a="handover">✓ Abgegeben</button><button class="b pri big" data-a="saveweights">Gewicht speichern</button>`
         : `<button class="b" data-a="close">Zurück</button><button class="b pri big" data-a="handover">✓ Abgegeben</button>`}</div>`);
@@ -801,7 +836,7 @@ function viewBestand() {
       <span class="right"><span class="sum">${money(orderVal(o, s))}</span><span class="tag ${o.status}">${o.status === 'sold' ? 'Abgeholt' : 'Reserviert'}</span></span>
       <span class="meta">${o.lines.length} Position${o.lines.length === 1 ? '' : 'en'}</span>
       <div class="items">${itemChips(o, s)}${o.note ? `<span class="ic note">${esc(o.note)}</span>` : ''}</div>
-      ${o.status !== 'sold' ? `<div class="foot"><button class="b sm pri" data-a="pickup" data-v="${o.id}">✓ Abholen</button></div>` : ''}
+      ${o.status !== 'sold' ? `<div class="foot row" style="gap:8px"><button class="b sm pri" data-a="pickup" data-v="${o.id}">✓ Abholen</button>${waButton(o, b)}</div>` : ''}
     </div>`;
   }).join('');
   return html;
@@ -872,6 +907,57 @@ function updateWeigh() {
   $('w_prog').innerHTML = `<div class="meter"><i style="width:${total ? Math.round((total - open) / total * 100) : 100}%"></i></div><span>${total - open} von ${total} Positionen gewogen</span>`;
 }
 
+/* Jahresrückblick: die wichtigsten Zahlen eines Jahres auf einer Seite */
+function reviewModal(year) {
+  const bs = S.batches.filter(b => (b.date || '').startsWith(year)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const years = [...new Set(S.batches.map(b => (b.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const animals = {}, perCust = {}, perProd = {}, perMonth = {};
+  let umsatz = 0, nOrders = 0, kg = 0, frozen = 0, biggest = null; const heaviest = {};
+  bs.forEach(b => {
+    const s = sp(b.speciesId);
+    animals[s.name] = (animals[s.name] || 0) + b.count;
+    frozen += Object.values(b.frozen || {}).reduce((a, v) => a + (+v || 0), 0);
+    const y = yieldOf(b); if (y && (!heaviest[s.name] || y.kg > heaviest[s.name].kg)) heaviest[s.name] = { ...y, b };
+    b.orders.forEach(o => {
+      nOrders++;
+      const v = orderVal(o, s).v, name = cust(o.customerId)?.name || '?';
+      const pc = perCust[name] ||= { n: 0, v: 0 }; pc.n++;
+      if (o.status === 'sold') { umsatz += v; pc.v += v; const m = b.date.slice(0, 7); perMonth[m] = (perMonth[m] || 0) + v; if (!biggest || v > biggest.v) biggest = { v, name, b }; }
+      o.lines.forEach(l => {
+        if (l.kg !== '' && l.kg != null) kg += +l.kg;
+        const p = prodOf(l, s); if (!p) return;
+        const key = `${p.name} (${lineSp(l, s).name})`;
+        perProd[key] = (perProd[key] || 0) + (+l.qty || 0);
+      });
+    });
+  });
+  const out = S.freezerOut.filter(e => (e.date || '').startsWith(year)).reduce((a, e) => a + (+e.qty || 0), 0);
+  const top = (o, f) => Object.entries(o).sort((a, b) => f(b[1]) - f(a[1]))[0];
+  const fan = top(perCust, x => x.n * 1e6 + x.v), prod = top(perProd, x => x), month = top(perMonth, x => x);
+  const monthName = m => new Date(m + '-01T12:00').toLocaleDateString('de-DE', { month: 'long' });
+  const tiles = [
+    [bs.length, bs.length === 1 ? 'Schlachtung' : 'Schlachtungen'],
+    ...Object.entries(animals).map(([k, v]) => [v, k === 'Hähnchen' ? 'Hähnchen' : k === 'Pute' ? (v === 1 ? 'Pute' : 'Puten') : k === 'Gans' ? (v === 1 ? 'Gans' : 'Gänse') : k]),
+    [Math.round(umsatz).toLocaleString('de-DE') + ' €', 'Umsatz'],
+    [nOrders, nOrders === 1 ? 'Bestellung' : 'Bestellungen'],
+    [Object.keys(perCust).length, 'Kundinnen & Kunden'],
+    ...(kg ? [[fmt(Math.round(kg)) + ' kg', 'gewogen']] : [])
+  ].map(([n, l]) => `<div class="rv-tile"><b>${n}</b><span>${esc(l)}</span></div>`).join('');
+  const facts = [
+    fan && `Treueste Kundschaft: <b>${esc(fan[0])}</b> mit ${fan[1].n} Bestellung${fan[1].n === 1 ? '' : 'en'}${fan[1].v ? ` (${eur(fan[1].v)})` : ''}.`,
+    prod && `Am meisten gefragt: <b>${fmt(prod[1])}× ${esc(prod[0])}</b>.`,
+    biggest && biggest.v && `Größter Einkauf: <b>${eur(biggest.v)}</b> von ${esc(biggest.name)} am ${dateDE(biggest.b.date)}.`,
+    month && month[1] && `Stärkster Monat: <b>${monthName(month[0])}</b> mit ${eur(month[1])}.`,
+    ...Object.entries(heaviest).map(([n, h]) => `Schwerste ${esc(n === 'Pute' ? 'Puten' : n === 'Gans' ? 'Gänse' : n)}: <b>${fmt(h.kg)} kg</b> pro Tier am ${dateDE(h.b.date)}.`),
+    frozen && `Eingefroren: <b>${fmt(frozen)} Stück</b>${out ? `, davon ${fmt(out)} selbst gegessen` : ''}.`
+  ].filter(Boolean).map(x => `<li>${x}</li>`).join('');
+  ui.modal = { type: 'review' };
+  openModal(`${years.length > 1 ? `<div class="chips">${years.map(y => `<button class="chip ${y === year ? 'on' : ''}" data-a="review" data-v="${y}">${y}</button>`).join('')}</div>` : ''}
+    <div class="rv"><div class="eyebrow">Geflügelliste</div><h2>Unser Jahr ${esc(year)}</h2>
+      ${bs.length ? `<div class="rv-grid">${tiles}</div><ul class="rv-facts">${facts}</ul>` : '<p>Für dieses Jahr gibt es noch keine Schlachtungen.</p>'}</div>
+    <div class="row" style="margin-top:14px"><span class="sp"></span><button class="b" data-a="close">Schließen</button></div>`);
+}
+
 function freezeModal(b) {
   const s = sp(b.speciesId), c = calc(b, b.orders, {});
   const rows = s.products.filter(p => c.avail[p.id] !== null).map(p => {
@@ -899,7 +985,7 @@ function viewKunden() {
   }));
   const rows = [...S.customers].sort((a, b) => a.name.localeCompare(b.name, 'de')).map(c => {
     const x = stats[c.id] || { n: 0, sum: 0 };
-    return `<tr><td><div class="row" style="gap:12px;flex-wrap:nowrap">${avatar(c.name)}<b>${esc(c.name)}</b></div></td><td class="n">${x.n}</td><td class="n">${x.sum ? eur(x.sum) : ''}</td>
+    return `<tr><td><div class="row" style="gap:12px;flex-wrap:nowrap">${avatar(c.name)}<div><b>${esc(c.name)}</b>${c.phone ? `<div class="mute">${esc(c.phone)}</div>` : ''}</div></div></td><td class="n">${x.n}</td><td class="n">${x.sum ? eur(x.sum) : ''}</td>
       <td class="n"><button class="b sm" data-a="editcust" data-v="${c.id}">Ändern</button></td></tr>`;
   }).join('');
   return `<div class="phead"><div><div class="eyebrow">${S.customers.length} Kunden</div><h2>Stammkunden</h2></div><span class="sp"></span><button class="b pri" data-a="addcust">＋ Neuer Kunde</button></div>
@@ -931,9 +1017,6 @@ function viewUmsatz() {
         const key = p ? `${lineSp(l, s).name} ${p.name}${l.tk ? ' (Tiefkühler)' : ''}` : 'Sonderwünsche';
         const x = byProd[key] ||= { res: 0, done: 0, kg: 0, kgQty: 0, sum: 0 };
         const q = +l.qty || 0;
-        if (!done) { x.res += q; return; }
-        const lv = lineVal(l, s);
-        x.done += q; x.sum += lv.v; bPcs += q;
         if (l.kg !== '' && l.kg != null) {
           x.kg += +l.kg; x.kgQty += q; bKg += +l.kg; kgAll += +l.kg;
           if (p && !l.tk && q) {
@@ -942,6 +1025,9 @@ function viewUmsatz() {
             w.kg += +l.kg; w.qty += q;
           }
         }
+        if (!done) { x.res += q; return; }
+        const lv = lineVal(l, s);
+        x.done += q; x.sum += lv.v; bPcs += q;
         if (lv.est) soldEst += lv.v;
         if (lv.none && p) noPrice++;
       });
@@ -968,24 +1054,60 @@ function viewUmsatz() {
     const pts = arr.sort(chrono).map(w => ({ x: w.b.date, v: w.kg / w.qty, tip: `${dateDE(w.b.date)}: Ø ${fmt(w.kg / w.qty)} kg pro Stück (${fmt(w.qty)} Stück, ${fmt(w.kg)} kg gewogen)` }));
     return `<div class="chart"><div class="c-title">${esc(k)}</div><div class="mute">Ø kg pro Stück</div>${lineChart(pts)}</div>`;
   }).join('');
+  const ySp = {};
+  [...byBatch].sort(chrono).forEach(x => { const y = yieldOf(x.b); if (y) (ySp[x.s.name] ||= []).push({ x: x.b.date, v: y.kg, tip: `${dateDE(x.b.date)}: ${fmt(y.kg)} kg pro Tier (${y.how})` }); });
+  const yieldCharts = Object.entries(ySp).map(([name, pts]) => {
+    const avgAll = pts.reduce((a, p) => a + p.v, 0) / pts.length;
+    return `<div class="chart"><div class="c-title">${esc(name)}: Ø ${fmt(avgAll)} kg pro Tier</div><div class="mute">je Schlachtung</div>${lineChart(pts)}</div>`;
+  }).join('');
+  const yieldSection = `<div class="card"><h3 style="margin:0 0 4px">Ausbeute pro Tier</h3>
+    <div class="mute">Verkaufbares Fleisch pro Tier, berechnet aus den gewogenen Stücken: ganze Tiere, sonst Hälften, sonst die Einzelteile zusammen.</div>
+    ${yieldCharts ? `<div class="charts">${yieldCharts}</div>` : `<div class="empty">${ICON.egg}Noch zu wenig gewogen. Sobald ganze Tiere, Hälften oder alle Einzelteile eines Termins gewogen sind, erscheint hier die Ausbeute.</div>`}</div>`;
   const weightSection = kgBatches.length ? `<div class="card"><h3 style="margin:0 0 4px">Gewicht je Schlachtung</h3>
-      <div class="mute">Nur Stücke, die beim Abholen gewogen wurden. Auf einen Punkt oder Balken tippen zeigt die Zahlen.</div>
+      <div class="mute">Nur Stücke, die gewogen wurden. Auf einen Punkt oder Balken tippen zeigt die Zahlen.</div>
       <div class="chart" style="margin-top:12px"><div class="c-title">Gewogen gesamt</div><div class="mute">kg je Schlachtung</div>${barChart(kgBatches.map(x => ({ x: x.b.date, v: x.bKg, tip: `${x.s.name} ${dateDE(x.b.date)}: ${fmt(x.bKg)} kg gewogen` })))}</div>
       ${weightCharts ? `<div class="charts">${weightCharts}</div>` : ''}</div>`
-    : `<div class="card"><h3 style="margin:0 0 4px">Gewicht je Schlachtung</h3><div class="empty">${ICON.umsatz}Noch nichts gewogen. Sobald beim Abholen Gewichte eingetragen werden, erscheinen hier die Diagramme.</div></div>`;
-  return `<div class="phead"><div><div class="eyebrow">Auswertung</div><h2>Statistik</h2></div></div>
+    : `<div class="card"><h3 style="margin:0 0 4px">Gewicht je Schlachtung</h3><div class="empty">${ICON.umsatz}Noch nichts gewogen. Sobald Gewichte eingetragen werden, erscheinen hier die Diagramme.</div></div>`;
+  const rvYear = ui.year !== 'all' ? ui.year : (years[0] || today().slice(0, 4));
+  return `<div class="phead"><div><div class="eyebrow">Auswertung</div><h2>Statistik</h2></div><span class="sp"></span>${years.length ? `<button class="b pri" data-a="review" data-v="${rvYear}">🎉 Jahresrückblick ${rvYear}</button>` : ''}</div>
   <div class="chips"><button class="chip ${ui.year === 'all' ? 'on' : ''}" data-a="year" data-v="all">Gesamt</button>${years.map(y => `<button class="chip ${ui.year === y ? 'on' : ''}" data-a="year" data-v="${y}">${y}</button>`).join('')}</div>
   <div class="stat"><div class="card"><span class="mute">Umsatz (abgeholt)</span><b>${eur(sold)}</b>${soldEst ? `<span class="mute">davon geschätzt ${eur(soldEst)}</span>` : ''}</div>
   <div class="card"><span class="mute">Noch offen (reserviert, geschätzt)</span><b>${eur(open)}</b></div>
   <div class="card"><span class="mute">Schlachtungen</span><b>${bs.length}</b><span class="mute">${animalTxt}</span></div>
-  <div class="card"><span class="mute">Gewogen (abgeholt)</span><b>${kgAll ? fmt(kgAll) + ' kg' : '–'}</b><span class="mute">${nOrders} abgeholte Bestellungen</span></div>
+  <div class="card"><span class="mute">Gewogen</span><b>${kgAll ? fmt(kgAll) + ' kg' : '–'}</b><span class="mute">${nOrders} abgeholte Bestellungen</span></div>
   ${tk.in ? `<div class="card"><span class="mute">Tiefkühler (gesamt)</span><b>${fmt(tk.left)} da</b><span class="mute">${fmt(tk.in)} eingefroren · ${fmt(tk.sold)} verkauft · ${fmt(tk.out)} selbst</span></div>` : ''}</div>
   ${noPrice ? `<div class="warn">⚠ ${noPrice} abgeholte Position(en) ohne Preis – bitte Preise unter Einstellungen eintragen (und Ø-Gewicht für die Schätzung).</div>` : ''}
   ${weightSection}
+  ${yieldSection}
   <div class="card"><h3 style="margin:0 0 10px">Alle Schlachtungen</h3><div class="mute">„Verplant“ zeigt das knappste Teil: so viel davon ist reserviert oder abgeholt. 100 % heißt, es ist ausverkauft.</div>${batchRows ? `<div class="scroll"><table><tr><th>Termin</th><th class="n">Tiere</th><th class="n">Verplant</th><th class="n">Bestell.</th><th class="n">Stück abgeh.</th><th class="n">Eingefr.</th><th class="n">Gewogen</th><th class="n">Umsatz</th><th class="n">Offen</th></tr>${batchRows}${sumRow}</table></div>` : '<div class="empty">Noch keine Termine.</div>'}</div>
   <div class="card"><h3 style="margin:0 0 10px">Pro Produkt</h3><div class="mute">Ø Gewicht zählt nur Stücke, die gewogen wurden.</div>${prodRows ? `<div class="scroll"><table><tr><th>Produkt</th><th class="n">Reserviert</th><th class="n">Abgeholt</th><th class="n">Gewogen</th><th class="n">Ø pro Stück</th><th class="n">Umsatz</th></tr>${prodRows}</table></div>` : '<div class="empty">Noch keine Bestellungen.</div>'}</div>
   <div class="card"><h3 style="margin:0 0 10px">Pro Kunde</h3>${bars(byCust)}</div>
   <div class="card"><h3 style="margin:0 0 10px">Pro Monat</h3>${bars(monthsObj, monthName)}</div>`;
+}
+
+/* Ausbeute pro Tier eines Schlachttermins aus den gewogenen Stücken:
+   Ø ganzes Tier, sonst 2 × Ø halbes Tier, sonst Summe der Einzelteile (Teile pro Tier × Ø Stückgewicht) */
+function yieldOf(b) {
+  const s = sp(b.speciesId), acc = {};
+  b.orders.forEach(o => o.lines.forEach(l => {
+    if (l.tk || l.kg === '' || l.kg == null || !(+l.qty)) return;
+    const a = acc[l.productId] ||= { kg: 0, q: 0 }; a.kg += +l.kg; a.q += +l.qty;
+  }));
+  const avg = id => acc[id]?.q ? acc[id].kg / acc[id].q : null;
+  const ganz = s.products.find(p => p.id === 'ganz'), halb = s.products.find(p => p.id === 'halb');
+  if (ganz && avg('ganz')) return { kg: avg('ganz'), how: acc.ganz.q === 1 ? 'ein ganzes Tier gewogen' : `Ø von ${fmt(acc.ganz.q)} ganzen Tieren` };
+  if (halb && avg('halb')) return { kg: 2 * avg('halb'), how: acc.halb.q === 1 ? '2 × eine Hälfte' : `2 × Ø von ${fmt(acc.halb.q)} Hälften` };
+  const meat = ganz ? Object.keys(ganz.uses) : [];
+  if (!meat.length) return null;
+  let kg = 0; const used = [];
+  for (const k of meat) {
+    const part = s.parts.find(x => x.id === k);
+    const single = s.products.find(p => Object.keys(p.uses).length === 1 && p.uses[k] === 1);
+    const a = single && avg(single.id);
+    if (!part || !a) return null;
+    kg += part.perAnimal * a; used.push(`${fmt(part.perAnimal)} × ${single.name} ${fmt(a)} kg`);
+  }
+  return { kg, how: 'aus den Teilen: ' + used.join(' + ') };
 }
 
 /* ---------- Diagramme (SVG, eine Reihe je Diagramm, Farben aus den Tokens) ---------- */
@@ -1153,6 +1275,14 @@ function pricePh(l, s) {
 }
 
 /* ---------- Aktionen ---------- */
+function custModal(c) {
+  ui.modal = { type: 'cust', id: c.id };
+  openModal(`<h2>${c.id ? 'Kunde ändern' : 'Neuer Kunde'}</h2>
+    <label for="c_name">Name</label><input id="c_name" autocapitalize="words" value="${esc(c.name)}">
+    <label for="c_phone">Handynummer (für WhatsApp, optional)</label><input id="c_phone" type="tel" inputmode="tel" placeholder="z. B. 0171 2345678" value="${esc(c.phone || '')}">
+    <div id="c_warn"></div>
+    <div class="row" style="margin-top:18px">${c.id ? '<button class="b dan" data-a="delcust">Löschen</button>' : ''}<span class="sp"></span><button class="b" data-a="close">Abbrechen</button><button class="b pri" data-a="savecust">Speichern</button></div>`);
+}
 function resolveCustomer(name) {
   name = name.trim(); if (!name) return null;
   let c = S.customers.find(x => x.name.toLowerCase() === name.toLowerCase());
@@ -1245,16 +1375,27 @@ document.addEventListener('click', async e => {
       if (await sure('Bestellung wirklich löschen?')) { const b = batchOf(ui.modal.batchId); b.orders = b.orders.filter(o => o.id !== ui.modal.d.id); closeModal(); stay(); }
       break;
     }
-    case 'addcust': { const n = await ask('Name des neuen Kunden:'); if (n && n.trim()) { resolveCustomer(n); stay(); } break; }
-    case 'editcust': {
-      const c = cust(v), n = await ask('Name ändern (leer lassen zum Löschen):', c.name);
-      if (n === null) break;
-      if (!n.trim()) {
-        if (S.batches.some(b => b.orders.some(o => o.customerId === c.id))) await say('Dieser Kunde hat Bestellungen und kann nicht gelöscht werden.');
-        else S.customers = S.customers.filter(x => x !== c);
-      } else c.name = n.trim();
-      stay(); break;
+    case 'addcust': custModal({ id: null, name: '', phone: '' }); break;
+    case 'editcust': custModal(cust(v)); break;
+    case 'savecust': {
+      const name = $('c_name').value.trim(), phone = $('c_phone').value.trim(), id = ui.modal.id;
+      if (!name) { $('c_warn').innerHTML = '<div class="warn">Bitte einen Namen eintragen.</div>'; break; }
+      const dup = S.customers.find(x => x.id !== id && x.name.toLowerCase() === name.toLowerCase());
+      if (dup) { $('c_warn').innerHTML = '<div class="warn">Diesen Namen gibt es schon.</div>'; break; }
+      let c = id ? cust(id) : null;
+      if (!c) { c = { id: uid(), name }; S.customers.push(c); }
+      c.name = name;
+      if (phone) c.phone = phone; else delete c.phone;
+      closeModal(); stay(); break;
     }
+    case 'delcust': {
+      const c = cust(ui.modal.id);
+      if (S.batches.some(b => b.orders.some(o => o.customerId === c.id))) { $('c_warn').innerHTML = '<div class="warn">Dieser Kunde hat Bestellungen und kann nicht gelöscht werden.</div>'; break; }
+      if (await sure(`${c.name} wirklich löschen?`)) { S.customers = S.customers.filter(x => x !== c); closeModal(); stay(); }
+      break;
+    }
+    case 'wa': break;   // Link öffnet WhatsApp selbst
+    case 'review': reviewModal(v); break;
     /* Einstellungen */
     case 'addspecies': { const n = await ask('Name der Tierart (z. B. Ente):'); if (n && n.trim()) { S.species.push({ id: uid(), name: n.trim(), parts: [], products: [] }); stay(); } break; }
     case 'delspecies': {
