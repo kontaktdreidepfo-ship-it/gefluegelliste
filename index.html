@@ -705,6 +705,12 @@ function saleSheet(batchId, orderId) {
   ui.modal = { type: 'order', sale: true, batchId, d: JSON.parse(JSON.stringify(o)), isNew: false };
   drawOrder();
 }
+function persistSale() {
+  const m = ui.modal, b = batchOf(m.batchId), o = b?.orders.find(x => x.id === m.d.id);
+  if (!o) return;
+  o.lines = JSON.parse(JSON.stringify(m.d.lines));
+  save(); render();
+}
 function drawSale() {
   const m = ui.modal, b = batchOf(m.batchId), s = sp(b.speciesId), d = m.d;
   const numVal = v => v === '' || v == null ? '' : String(v).replace('.', ',');
@@ -712,7 +718,7 @@ function drawSale() {
   const lines = d.lines.map(l => {
     const p = prodOf(l, s);
     const edit = m.editAll || needsKg(l, s);
-    const kg = p && p.unit !== 'stk' ? `<input class="num" type="text" inputmode="decimal" data-f="kg" value="${numVal(l.kg)}" placeholder="kg" aria-label="Gewicht in kg">` : '';
+    const kg = p && p.unit !== 'stk' ? `<input class="num" type="text" inputmode="decimal" data-f="kg" value="${numVal(l.kg)}" placeholder="${+l.qty > 1 ? 'kg zus.' : 'kg'}" aria-label="Gewicht in kg${+l.qty > 1 ? ' für alle ' + fmt(+l.qty) + ' Stück' : ''}">` : '';
     const lv = lineVal(l, s);
     const done = `<div class="sale-done">${l.kg !== '' && l.kg != null ? `<span>${fmt(+l.kg)} kg</span>` : ''}<b>${lv.none ? '–' : (lv.est ? '≈ ' : '') + eur(lv.v)}</b></div>`;
     return `<div class="sale-line" data-l="${l.id}">
@@ -726,12 +732,14 @@ function drawSale() {
     <div class="mute">${esc(batchLabel(b))} · ${d.status === 'sold' ? 'bereits abgeholt' : 'reserviert'}</div></div></div>
     ${d.note ? `<div class="sale-ordernote">${esc(d.note)}</div>` : ''}
     <div class="card" style="margin:14px 0 0;padding-block:4px">${lines || '<div class="empty">Keine Positionen.</div>'}</div>
-    <div class="ticket"><span>${open ? 'Summe (teils geschätzt)' : 'Zu zahlen'}</span><b id="o_sum"></b></div>
-    <div class="mute">${open ? 'Noch nicht alles gewogen: Gewicht oben eintragen, sonst gilt der geschätzte Preis (≈).' : 'Alles gewogen – der Preis steht fest.'}
+    <div class="ticket"><span>${open ? 'Summe bisher' : 'Zu zahlen'}</span><b id="o_sum"></b></div>
+    <div class="mute">${open ? 'Gewicht oben eintragen (bei mehreren Stück das Gewicht zusammen). Es wird sofort gespeichert – der Kunde kann auch später abholen.' : 'Alles gewogen – der Preis steht fest.'}
       ${!open && !m.editAll ? ' <button class="b sm" data-a="saleeditkg" style="margin-left:6px">Gewicht ändern</button>' : ''}</div>
     <div id="warn" hidden></div>
-    <div class="row" style="margin-top:18px"><button class="b" data-a="saleedit">Bearbeiten</button><span class="sp"></span><button class="b" data-a="close">Zurück</button>
-      <button class="b pri big" data-a="handover">✓ Abgegeben</button></div>`);
+    <div class="row" style="margin-top:18px"><button class="b" data-a="saleedit">Bearbeiten</button><span class="sp"></span>
+      ${open || m.editAll
+        ? `<button class="b" data-a="close">Zurück</button><button class="b" data-a="handover">✓ Abgegeben</button><button class="b pri big" data-a="saveweights">Gewicht speichern</button>`
+        : `<button class="b" data-a="close">Zurück</button><button class="b pri big" data-a="handover">✓ Abgegeben</button>`}</div>`);
   updateWarn();
 }
 
@@ -1206,6 +1214,7 @@ document.addEventListener('click', async e => {
     case 'saledone': ui.saleDone = !ui.saleDone; render(); break;
     case 'saleedit': ui.modal.sale = false; ui.modal.pickup = true; ui.modal.d.status = 'sold'; drawOrder(); break;
     case 'saleeditkg': ui.modal.editAll = true; drawOrder(); break;
+    case 'saveweights': persistSale(); ui.modal.editAll = false; drawOrder(); break;
     case 'weigh': weighModal(ui.batchId); break;
     case 'handover': {
       const d = ui.modal.d, b = batchOf(ui.modal.batchId);
@@ -1309,6 +1318,7 @@ $('modal').addEventListener('input', e => {
 });
 $('modal').addEventListener('change', e => {
   if (e.target.dataset?.wl) { save(); return; }
+  if (ui.modal?.sale && ['kg', 'price'].includes(e.target.dataset?.f)) { persistSale(); return; }
   const t = e.target, row = t.closest('[data-l]');
   if (t.id === 'o_status') ui.modal.d.status = t.value;
   if (!row || t.dataset.f !== 'productId') return;
